@@ -1,0 +1,30 @@
+name: docre
+version: 0.0.1.0
+synopsis: docker to consul registry
+license: GPL-3
+license-file: LICENSE
+author: ml
+maintainer: metaml@gmail.com
+category: dunno
+build-type: Simple
+cabal-version: >= 1.20
+
+library
+  hs-source-dirs: src
+  ghc-options: -Wall -O2
+  build-depends: base >= 4.8 && < 5
+  default-language: Haskell2010
+  
+executable app
+  main-is: Main.hs
+  hs-source-dirs: src
+  ghc-options: -Wall -O2
+  build-depends: base >= 4.8 && < 5
+  default-language: Haskell2010
+
+executable build
+  main-is: Build.hs
+  hs-source-dirs: .
+  ghc-options: -Wall -O2
+  build-depends: base >= 4.8 && < 5, shake, hinotify, split, text, filepath
+  default-language: Haskell2010

@@ -1,0 +1,14 @@
+Main
+Spec
+*.hi
+*.dyn_hi
+*.o
+*.dyn_o
+.cabal*
+.ghc
+.shake
+.ghci
+.#*.hs
+cabal.sandbox.config
+dist
+bin
