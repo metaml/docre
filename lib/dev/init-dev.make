@@ -2,7 +2,7 @@
 
 PATH := /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-dev: init ghc cabal sandbox shake
+dev: init ghc cabal sandbox
 
 undev:
 	rm -rf ~/.cabal
@@ -43,8 +43,6 @@ cabal-install:
 		&& sudo ./bootstrap.sh --global; \
 	fi
 
-shake:
-	sudo cabal update && sudo cabal install --global shake
 init:
 	sudo apt-get update -y
 	sudo apt-get install -y libgmp-dev libncurses5-dev gcc
