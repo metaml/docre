@@ -1,6 +1,8 @@
-.PHONY: shake build clean init-dev
+.PHONY: shake build clean init-dev default
 
-shake: build
+default: shake
+
+shake: update build
 	bin/build shake
 
 build: 
@@ -8,7 +10,8 @@ build:
 	mkdir -p bin
 	cp dist/build/build/build bin
 
-clean:
-	bin/build clobber
+update:; cabal install --only-dependencies
+
+clean:;	bin/build clobber
 
 init-dev:; make -f lib/dev/init-dev.make dev

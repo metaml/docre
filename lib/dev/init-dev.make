@@ -45,5 +45,5 @@ cabal-install:
 
 init:
 	sudo apt-get update -y
-	sudo apt-get install -y libgmp-dev libncurses5-dev gcc
-	sudo apt-get install -y ghc happy alex haddock dblatex xsltproc cabal-install
+	sudo apt-get install -y libgmp-dev libncurses5-dev gcc python-pygments
+	sudo apt-get install -y ghc happy alex haddock dblatex xsltproc cabal-install 

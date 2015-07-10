@@ -10,18 +10,18 @@ import Pipes
 main :: IO ()
 main = runEffect $ producer >-> consumer
 
---| @todo: broken commit fix later
+-- | @todo: broken commit fix later
 producer :: Producer String IO ()
 producer = do
   eof <- lift isEOF 
   h <- openFile "/var/run/docker.sock" ReadMode
-  withFile h reader (\h -> do
+  withFile h reader (\s -> do
     c <- hGetContents h
     yield c
     return ()
     producer)
 
-reader :: Handle -> IO ()
+reader :: Handle -> IO (a)
 reader h = do
   return $ hGetContents h
 

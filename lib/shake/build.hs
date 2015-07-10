@@ -1,6 +1,6 @@
 import System.Environment (lookupEnv)
 import System.FilePath (dropExtension)
-import System.INotify
+import System.INotify 
 import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
 import Data.Char (toLower)
@@ -14,7 +14,7 @@ main = shakeArgs shakeOptions $ do
   "app" ~> do
     cmd "cabal build app"
   "cc" ~> do
-    need ["app"]
+    (Exit _) <- cmd "cabal build app" -- ignore errors
     dirs <- liftIO $ lookupEnv "SRC"
     let ds = words $ fromMaybe "src" dirs
     liftIO $ watch ds
@@ -49,11 +49,8 @@ watch fs = withINotify $ \inotify -> do
   let fileEvents = [Create, CloseWrite, Delete, DeleteSelf, Modify, Move]
   wds <- mapM (\f -> addWatch inotify fileEvents f (handleEvent f)) fs
   putStrLn "compling continuously"
-  forever $ threadDelay (3600*10^6)
+  _ <- ($) forever $ threadDelay (3600*1000000)
   mapM_ (\wd -> removeWatch wd) wds
-  where
-    handleEvent :: FilePath -> Event -> IO ()
-    handleEvent f e = do
-      () <- cmd "cabal build app"
-      return ()
+  where handleEvent :: FilePath -> Event -> IO ()
+        handleEvent _ _ = cmd "cabal build app"
 
