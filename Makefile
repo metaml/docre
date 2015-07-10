@@ -8,6 +8,7 @@ build:
 	mkdir -p bin
 	cp dist/build/build/build bin
 
-clean:; ./bin/build clean
+clean:
+	bin/build clobber
 
 init-dev:; make -f lib/dev/init-dev.make dev

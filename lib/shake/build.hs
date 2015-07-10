@@ -1,27 +1,56 @@
+import System.Environment (lookupEnv)
 import System.FilePath (dropExtension)
+import System.INotify
+import Control.Concurrent (threadDelay)
+import Control.Monad (forever)
 import Data.Char (toLower)
 import Data.List.Split (splitOn)
+import Data.Maybe (fromMaybe)
 import Development.Shake.FilePath ((<.>), (</>), takeFileName)
 import Development.Shake
 
 main :: IO ()
 main = shakeArgs shakeOptions $ do
-         "build" ~> do
-           cmd "cabal build app"
-         "shake" ~> do
-           hs <- getDirectoryFiles "lib/shake" ["//*.hs"]
-           need $ map (\(h,_) -> "bin" </> dropExtension h) $ hns hs
-         "bin/*" %> \bin -> do -- /* is not cool
-           let h = "lib/shake" </> takeFileName bin
-           cmd "cabal exec -- ghc -o" [bin, h <.> "hs"]
-         "clean" ~> do
-           removeFilesAfter "dist" ["//*"]
-           removeFilesAfter "bin" ["//*"]
+  "app" ~> do
+    cmd "cabal build app"
+  "cc" ~> do
+    need ["app"]
+    dirs <- liftIO $ lookupEnv "SRC"
+    let ds = words $ fromMaybe "src" dirs
+    liftIO $ watch ds
+  "update" ~> do
+    cmd "cabal install --only-dependencies"
+  "shake" ~> do
+    hs <- getDirectoryFiles "lib/shake" ["//*.hs"]
+    need $ map (\(h,_) -> "bin" </> dropExtension h) $ hns hs
+  "bin/*" %> \bin -> do -- /* is not cool
+    let h = "lib/shake" </> takeFileName bin
+    cmd "cabal exec -- ghc -o" [bin, h <.> "hs"]
+  "clean" ~> do
+    removeFilesAfter "lib/shake" ["//*.o","//*.hi"]
+    removeFilesAfter "dist" ["//*"]
+  "clobber" ~> do
+    need ["clean"]
+    removeFilesAfter "dist" ["//*"]
+    removeFilesAfter "bin" ["//*"]
 
-type HaskellSrc = String
+type ShakeSrc = String
 type Name = String
 
-hns :: [HaskellSrc] -> [(HaskellSrc, Name)]
-hns hs = let ns = map (\f -> dropExtension (last $ splitOn "/" f)) hs
-         in zip hs (map (\n -> map toLower n) ns)
+hns :: [ShakeSrc] -> [(ShakeSrc, Name)]
+hns ss = let ns = map (\f -> dropExtension (last $ splitOn "/" f)) ss
+         in zip ss (map (\n -> map toLower n) ns)
+
+watch :: [FilePath] -> IO ()
+watch fs = withINotify $ \inotify -> do
+  let fileEvents = [Create, CloseWrite, Delete, DeleteSelf, Modify, Move]
+  wds <- mapM (\f -> addWatch inotify fileEvents f (handleEvent f)) fs
+  putStrLn "compling continuously"
+  forever $ threadDelay (3600*10^6)
+  mapM_ (\wd -> removeWatch wd) wds
+  where
+    handleEvent :: FilePath -> Event -> IO ()
+    handleEvent f e = do
+      () <- cmd "cabal build app"
+      return ()
 
