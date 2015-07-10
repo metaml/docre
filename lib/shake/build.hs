@@ -18,6 +18,9 @@ main = shakeArgs shakeOptions $ do
     dirs <- liftIO $ lookupEnv "SRC"
     let ds = words $ fromMaybe "src" dirs
     liftIO $ watch ds
+  "run" ~> do
+    need ["app"]
+    cmd "dist/build/app/app"
   "update" ~> do
     cmd "cabal install --only-dependencies"
   "shake" ~> do
