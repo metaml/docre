@@ -21,6 +21,7 @@ executable app
   ghc-options: -Wall -O2 -threaded -rtsopts -with-rtsopts=-I0
   default-language: Haskell2010
   build-depends: base == 4.*,
+                 bytestring == 0.10.*,
                  pipes == 4.*
 
 executable build

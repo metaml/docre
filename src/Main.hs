@@ -1,68 +1,35 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import System.IO (openFile, isEOF, hGetContents, hClose, Handle, IOMode(ReadMode))
-import Control.Monad (unless)
-import Control.Exception (try, throwIO)
+import Prelude hiding (putStrLn, getLine)
 import qualified GHC.IO.Exception as G
+import System.IO (isEOF)
+import Control.Exception (try, throwIO)
 import Control.Monad (unless)
+import Data.ByteString.Char8
 import Pipes
 
 main :: IO ()
-main = runEffect $ producer >-> consumer
+main = runEffect $ docker >-> consul
 
 -- | @todo: broken commit fix later
-producer :: Producer String IO ()
-producer = do
-  eof <- lift isEOF 
-  h <- openFile "/var/run/docker.sock" ReadMode
-  withFile h reader (\s -> do
-    c <- hGetContents h
-    yield c
-    return ()
-    producer)
-
-reader :: Handle -> IO (a)
-reader h = do
-  return $ hGetContents h
-
-consumer :: Consumer String IO ()
-consumer = do
-  l <- await
-  x <- lift $ try $ putStrLn ("consumer: " ++ l)
-  case x of
-    Left e@(G.IOError { G.ioe_type = t}) ->
-      -- gracefully terminate on a broken pipe error
-      lift $ unless (t == G.ResourceVanished) $ throwIO e
-    Right () -> consumer
-
-withFile :: Handle -> (Handle -> IO a) -> IO a
-withFile h f = do  
-  --- h <- openFile path mode   
-  r <- f h
-  --- hClose h
-  return r
-
-producer' :: Producer String IO ()
-producer' = do
+docker :: Producer ByteString IO ()
+docker = do
   eof <- lift isEOF 
   unless eof $ do
-    l <- lift getLine
+    l <- lift reader
     yield l
-    producer
+    docker
 
-consumer' :: Consumer String IO ()
-consumer' = do
+reader :: IO ByteString
+reader = getLine
+
+consul :: Consumer ByteString IO ()
+consul = do
   l <- await
-  x <- lift $ try $ putStrLn ("consumer: " ++ l)
+  x <- lift $ try $ putStrLn l
   case x of
-    Left e@(G.IOError { G.ioe_type = t}) ->
+    Left e@(G.IOError {G.ioe_type = t}) ->
       -- gracefully terminate on a broken pipe error
-      lift $ unless (t == G.ResourceVanished) $ throwIO e
-    Right () -> consumer
-
-withFile' :: FilePath -> IOMode -> (Handle -> IO a) -> IO a  
-withFile' path mode f = do  
-  h <- openFile path mode   
-  r <- f h
-  hClose h
-  return r
+      lift $ unless (G.ResourceVanished == t) $ throwIO e
+    Right () -> consul
