@@ -4,10 +4,12 @@ module Main where
 import Prelude hiding (putStrLn, getLine)
 import qualified GHC.IO.Exception as G
 import System.IO (isEOF)
+import Network.Socket hiding (recv)
+import Network.Socket.ByteString (recv, sendAll)
 import Control.Exception (try, throwIO)
 import Control.Monad (unless)
-import Data.ByteString.Char8
-import Pipes
+import Data.ByteString.Char8 (putStrLn, pack, ByteString)
+import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer)
 
 main :: IO ()
 main = runEffect $ docker >-> consul
@@ -22,7 +24,17 @@ docker = do
     docker
 
 reader :: IO ByteString
-reader = getLine
+reader = do
+  putStrLn "start reading"
+  addrs <- getAddrInfo Nothing (Just "google.com") (Just "80")
+  let server = head addrs
+  s <- socket (addrFamily server) Stream defaultProtocol
+  connect s (addrAddress server)
+  sendAll s $ pack "GET /\n\n"
+  msg <- recv s 1024
+  sClose s
+  putStrLn "done reading"
+  return msg
 
 consul :: Consumer ByteString IO ()
 consul = do

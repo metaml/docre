@@ -12,6 +12,10 @@ build:
 
 update:; cabal install --only-dependencies
 
-clean:;	bin/build clobber
+clean:;	if [ -f bin/build ]; then bin/build clobber; fi
 
-init-dev:; make -f lib/dev/init-dev.make dev
+init-dev: clobber
+	cd lib/dev && make -f init-dev.make dev
+
+clobber: clean
+	rm -rf ~/.cabal ~/.ghc .cabal-sandbox
