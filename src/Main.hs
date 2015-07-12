@@ -7,33 +7,33 @@ import System.IO (isEOF)
 import Network.Socket hiding (recv)
 import Network.Socket.ByteString (recv, sendAll)
 import Control.Exception (try, throwIO)
-import Control.Monad (unless)
+import Control.Monad (unless, forever)
 import Data.ByteString.Char8 (putStrLn, pack, ByteString)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer)
 
+-- instance FromJSON Event
+-- instance ToJSON Event
+    
 main :: IO ()
 main = runEffect $ docker >-> consul
 
 -- | @todo: broken commit fix later
 docker :: Producer ByteString IO ()
 docker = do
+  s <- lift $ socket AF_UNIX Stream defaultProtocol
+  lift $ connect s $ SockAddrUnix "/var/run/docker.sock"
   eof <- lift isEOF 
   unless eof $ do
-    l <- lift reader
-    yield l
-    docker
+    forever $ do
+      l <- lift $ reader s
+      yield l
+  lift $ sClose s
+  docker
 
-reader :: IO ByteString
-reader = do
-  putStrLn "start reading"
-  addrs <- getAddrInfo Nothing (Just "google.com") (Just "80")
-  let server = head addrs
-  s <- socket (addrFamily server) Stream defaultProtocol
-  connect s (addrAddress server)
-  sendAll s $ pack "GET /\n\n"
-  msg <- recv s 1024
-  sClose s
-  putStrLn "done reading"
+reader :: Socket -> IO ByteString
+reader s = do
+  sendAll s $ pack "GET /events HTTP/1.1\n\n"
+  msg <- recv s 4096
   return msg
 
 consul :: Consumer ByteString IO ()
