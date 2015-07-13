@@ -10,29 +10,25 @@ import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
 import Data.ByteString.Char8 (putStrLn, pack, ByteString)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer)
+import Data.Aeson (encode, decode)
+import Data.Docker (Event)
 
--- instance FromJSON Event
--- instance ToJSON Event
-    
 main :: IO ()
 main = runEffect $ docker >-> consul
 
--- | @todo: broken commit fix later
+-- | @todo: handle error cases
 docker :: Producer ByteString IO ()
 docker = do
   s <- lift $ socket AF_UNIX Stream defaultProtocol
   lift $ connect s $ SockAddrUnix "/var/run/docker.sock"
-  eof <- lift isEOF 
-  unless eof $ do
-    forever $ do
-      l <- lift $ reader s
-      yield l
+  _ <- forever $ do
+         lift (reader s) >>= yield 
   lift $ sClose s
   docker
 
 reader :: Socket -> IO ByteString
 reader s = do
-  sendAll s $ pack "GET /events HTTP/1.1\n\n"
+  sendAll s "GET /events HTTP/1.1\n\n"
   msg <- recv s 4096
   return msg
 
