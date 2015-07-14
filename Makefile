@@ -1,5 +1,7 @@
 .PHONY: shake build clean init-dev default
 
+# prerequisite: make init-dev 
+
 default: shake
 
 shake: update build
