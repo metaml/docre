@@ -29,6 +29,7 @@ executable app
                  bytestring == 0.10.*,
                  network == 2.6.*,
                  pipes == 4.*,
+                 pipes-http == 1.0.*,
                  aeson == 0.9.*,
                  text == 1.*
 
