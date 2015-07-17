@@ -1,6 +1,6 @@
 import System.Environment (lookupEnv)
 import System.FilePath (dropExtension)
-import System.INotify 
+import System.INotify
 import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
 import Data.Char (toLower)
@@ -16,7 +16,7 @@ main = shakeArgs shakeOptions $ do
   "cc" ~> do
     (Exit _) <- cmd "cabal build app" -- ignore errors
     dirs <- liftIO $ lookupEnv "SRC"
-    let ds = words $ fromMaybe "src" dirs
+    let ds = words $ fromMaybe "src/" dirs
     liftIO $ watch ds
   "run" ~> do
     need ["app"]

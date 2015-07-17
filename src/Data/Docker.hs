@@ -6,7 +6,7 @@ import GHC.Generics (Generic)
 import Control.Monad (mzero)
 import Data.Data (Typeable, Data)
 import Data.Aeson ((.:), (.=), object, FromJSON(..), ToJSON(..), Value(..))
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
     
 data Event = Event { eventStatus :: Text
                    , eventId :: Text
@@ -22,8 +22,8 @@ instance FromJSON Event where
   parseJSON _ = mzero
 
 instance ToJSON Event where
-  toJSON (Event eventStatus eventId eventFrom eventTime) = object [ "status" .= eventStatus
-                                                                  , "id" .= eventId
-                                                                  , "from" .= eventFrom
-                                                                  , "time" .= eventTime
-                                                                  ]
+  toJSON (Event eStatus eId eFrom eTime) = object [ "status" .= eStatus
+                                                  , "id" .= eId
+                                                  , "from" .= eFrom
+                                                  , "time" .= eTime
+                                                  ]

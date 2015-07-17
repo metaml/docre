@@ -1,18 +1,17 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 module Main where
 
-import Prelude hiding (putStrLn, getLine, words, concat)
+import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, null)
 import qualified GHC.IO.Exception as Ex
 import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
 import Network.Socket hiding (recv)
-import Network.Socket.ByteString.Lazy (recv, sendAll)
-import Data.ByteString.Internal (c2w)
-import Data.ByteString.Lazy (concat, split, ByteString)
-import Data.ByteString.Lazy.Char8 (putStrLn)
-import Data.Text.Lazy.Encoding (encodeUtf8)
+import Network.Socket.ByteString (recv, sendAll)
+import Data.ByteString (concat, length, drop, null, ByteString)
+import Data.ByteString.Char8 (putStrLn, lines, breakSubstring)
+import Data.Text.Encoding (encodeUtf8)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
-import Data.Aeson (decode)
+import Data.Aeson (decodeStrict)
 import Data.Docker (Event(..))
 
 main :: IO ()
@@ -30,9 +29,9 @@ docker = do
 json2event :: Pipe ByteString Event IO ()
 json2event = do
   r <- await
-  let j = (split (c2w '\n') r) !! 1
-  lift $ putStrLn j
-  case (decode j) of
+  let j = last (tokenize "\r\n" r)
+  lift $ print j
+  case (decodeStrict j) of
     Just e -> yield e
     Nothing -> lift $ putStrLn "### error json2event ###" >> print j
   json2event
@@ -48,9 +47,9 @@ id2container = do
   eId <- await
   s <- lift $ socket AF_UNIX Stream defaultProtocol
   lift $ connect s $ SockAddrUnix "/var/run/docker.sock"
-  lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1\r\n\r\n"]
+  lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1", "\r\n\r\n"]
   r <- lift $ recv s 4096
-  let j = (split (c2w '\n') r) !! 6
+  let j = lines r
   lift $ putStrLn "id2container:" >> print j
   id2container
 
@@ -66,10 +65,10 @@ event s = do
   j <- recv s 4096
   return j
 
--- | parse a raw HTTP ByteString
-response :: ByteString -> ByteString
-response r = last $ split (c2w '\n') r
-
+tokenize :: ByteString -> ByteString -> [ByteString]
+tokenize d bs = filter (\e -> e /= "") $ h : if null t then [] else tokenize d (drop (length h) t)
+                                             where (h, t) = breakSubstring d bs
+         
 -- | below: only for reference
 consul' :: Consumer (Maybe Event) IO ()
 consul' = do
@@ -80,5 +79,3 @@ consul' = do
       lift $ unless (Ex.ResourceVanished == t) $ throwIO e -- gracefully terminate on a broken pipe error
     Right () ->
       consul'
-
-
