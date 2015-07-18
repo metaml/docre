@@ -1,21 +1,23 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 module Main where
 
-import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, null)
+import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, null, lookup)
 import qualified GHC.IO.Exception as Ex
 import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
 import Network.Socket hiding (recv)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson as Aeson
-import Data.ByteString (concat, length, drop, null, ByteString)
+import Data.Maybe (fromMaybe, fromJust)
+import Data.ByteString (concat, length, drop, null, pack, ByteString)
 import Data.ByteString.Char8 (putStrLn, breakSubstring)
 import Data.Text.Encoding (encodeUtf8)
+import qualified Data.HashMap.Strict as HM
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
 
 main :: IO ()
-main = runEffect $ docker >-> json2event >-> event2Id >-> id2container >-> consul
+main = runEffect $ docker >-> json2event >-> event2Id >-> id2container >-> container2consul >-> consul
 
 -- | @todo: handle error cases
 docker :: Producer ByteString IO ()
@@ -28,7 +30,6 @@ json2event :: Pipe ByteString Event IO ()
 json2event = forever $ do
                r <- await
                let j = last (tokenize "\r\n" r)
-               lift $ putStrLn "json2event:" >> print j
                case (Aeson.decodeStrict j) of
                  Nothing -> lift $ putStrLn "error in json2event:" >> print j
                  Just e -> yield e
@@ -48,11 +49,23 @@ id2container = forever $ do
                            yield $ last (tokenize "\r\n" r)
                  lift $ sClose s
 
-consul :: Consumer ByteString IO ()
+container2consul :: Pipe ByteString Object IO ()
+container2consul = forever $ do
+                     j <- await
+                     let o :: Maybe Object = Aeson.decodeStrict j
+                     case o of
+                       Nothing -> lift $ putStrLn "error in container2consul"
+                       Just e -> yield e
+
+consul :: Consumer Object IO ()
 consul = forever $ do
-           j <- await
-           lift $ putStrLn j
-  
+           h  <- await
+           let did = fromMaybe "" (HM.lookup "Id" h)
+               name = fromMaybe "" (HM.lookup "Name" h)
+           lift $ print did
+           lift $ print name
+           lift $ print $ HM.lookup "NetworkSettings" h
+
 event :: Socket -> IO ByteString
 event s = do
   sendAll s "GET /events HTTP/1.1\r\n\r\n"
@@ -68,7 +81,8 @@ unixSocket = do
 tokenize :: ByteString -> ByteString -> [ByteString]
 tokenize d bs = filter (\e -> e /= "") $ h : if null t then [] else tokenize d (drop (length h) t)
                                              where (h, t) = breakSubstring d bs
-         
+
+                                                            
 -- | below: only for reference
 consul' :: Consumer (Maybe Event) IO ()
 consul' = do
