@@ -1,7 +1,5 @@
 .PHONY: shake build clean init-dev default
 
-# prerequisite: make init-dev 
-
 default: shake
 
 shake: update build
@@ -14,10 +12,10 @@ build:
 
 update:; cabal install --only-dependencies
 
-clean:;	if [ -f bin/build ]; then bin/build clobber; fi
-
 init-dev: clobber
 	cd lib/dev && make -f init-dev.make dev
+
+clean:;	if [ -f bin/build ]; then bin/build clobber; fi
 
 clobber: clean
 	rm -rf ~/.cabal ~/.ghc .cabal-sandbox
