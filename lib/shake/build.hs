@@ -1,7 +1,9 @@
+import System.Exit (exitSuccess)
 import System.Environment (lookupEnv)
 import System.FilePath (dropExtension)
+import System.FSNotify (watchTree, withManager)
 import System.INotify
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever)
 import Data.Char (toLower)
 import Data.List.Split (splitOn)
@@ -44,13 +46,13 @@ hns :: [ShakeSrc] -> [(ShakeSrc, Name)]
 hns ss = let ns = map (\f -> dropExtension (last $ splitOn "/" f)) ss
          in zip ss (map (\n -> map toLower n) ns)
 
+-- @todo: implement the following using FSNotify
 watch :: [FilePath] -> IO ()
 watch fs = withINotify $ \inotify -> do
-  let fileEvents = [Create, CloseWrite, Delete, DeleteSelf, Modify, Move]
+  let fileEvents = [CloseWrite, Delete, Move]
   wds <- mapM (\f -> addWatch inotify fileEvents f (handleEvent f)) fs
   putStrLn "compling continuously"
   _ <- ($) forever $ threadDelay (3600*1000000)
   mapM_ (\wd -> removeWatch wd) wds
   where handleEvent :: FilePath -> Event -> IO ()
-        handleEvent _ _ = cmd "cabal build app"
-
+        handleEvent _ _ = cmd "cabal build app" 

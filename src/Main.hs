@@ -1,26 +1,31 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 module Main where
 
-import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, null, lookup)
+import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, dropWhile, null, lookup)
 import qualified GHC.IO.Exception as Ex
+import qualified Data.HashMap.Strict as Map
 import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
 import Network.Socket hiding (recv)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
 import Data.Aeson.Types
-import Data.Maybe (fromMaybe, fromJust)
-import Data.ByteString (concat, length, drop, null, pack, ByteString)
+import Data.ByteString (concat, length, drop, null, ByteString)
 import Data.ByteString.Char8 (putStrLn, breakSubstring)
-import qualified Data.Text as Text
+import Data.Text (dropWhile, Text)
 import Data.Text.Encoding (encodeUtf8)
-import qualified Data.HashMap.Strict as HM
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
 
 main :: IO ()
 main = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
 
+type Status = ByteString
+type Cid = ByteString
+type Name = ByteString
+type Ip = ByteString        
+type Services = [ByteString]
+    
 -- | @todo: handle error cases
 docker :: Producer ByteString IO ()
 docker = forever $ do
@@ -37,39 +42,50 @@ json2event = forever $ do
                  Nothing -> lift $ putStrLn "error in json2event:" >> print j
                  Just e -> yield e
 
-event2id :: Pipe Event (ByteString, ByteString) IO ()
+event2id :: Pipe Event (Cid, Status) IO ()
 event2id = forever $ do
              e <- await
              yield $ (encodeUtf8 $ eventId e, encodeUtf8 $ eventStatus e)
 
-id2container :: Pipe (ByteString, ByteString) (ByteString, ByteString) IO ()
+id2container :: Pipe (Cid, Status) (ByteString, Status) IO ()
 id2container = forever $ do
                  s <- lift $ unixSocket
                  _ <- ($) forever $ do
                            (eId, status) <- await
                            lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1", "\r\n\r\n"]
-                           r <- lift $ recv s 4096
+                           r <- lift $ recv s 4096 -- r: http response
                            lift $ putStrLn "- id2container:" >> print r
                            yield $ (r, status)
                  lift $ sClose s
 
-container2consul :: Pipe (ByteString, ByteString) (Object, ByteString) IO ()
+container2consul :: Pipe (Cid, Status) (Object, Status) IO ()
 container2consul = forever $ do
-                     (r, status) <- await
+                     (r, status) <- await  -- r: http response
                      let o :: Maybe Object = decodeStrict (last $ tokenize "\r\n" r)
                      case o of
                        Nothing -> lift $ putStrLn "error in container2consul"
                        Just e -> yield (e, status)
                                  
-consul :: Consumer (Object, ByteString) IO ()
+consul :: Consumer (Object, Status) IO ()
 consul = forever $ do
            (h, status) <- await
-           let (Just (String did)) = HM.lookup "Id" h
-               (Just (String name)) = HM.lookup "Name" h
-               Just net = HM.lookup "NetworkSettings" h
+           let (Just (String cid)) = Map.lookup "Id" h
+               (Just (String name)) = Map.lookup "Name" h
+               Just net = Map.lookup "NetworkSettings" h
                (Just (String ip)) = ipAddress net
-           lift $ print status >> print name >> print ip >> print did >> putStrLn "##########################"
+               name' = dropWhile (\c -> c == '/') name
+--           case status of
+--             "start" -> lift $ undefined cid name' ip ["8080"]
+--             "stop" -> lift $ undefined cid name' ["8080"]
+--             _ -> lift $ return ()
+           lift $ print status >> print cid >> print name >> print ip
 
+type Status' = Text
+type Cid' = Text
+type Name' = Text
+type Ip' = Text        
+type Services' = [Text]
+           
 event :: Socket -> IO ByteString
 event s = do
   sendAll s "GET /events HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"
@@ -83,7 +99,7 @@ unixSocket = do
   return s
 
 ipAddress :: Value -> Maybe Value
-ipAddress (Object o) = HM.lookup "IPAddress" o
+ipAddress (Object obj) = Map.lookup "IPAddress" obj
 ipAddress _ = Nothing
 
 -- @todo: refactor

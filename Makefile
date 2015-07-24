@@ -12,8 +12,10 @@ build:
 
 update:; cabal install --only-dependencies
 
-init-dev: clobber
+init: clobber
 	cd lib/dev && make -f init-dev.make dev
+
+uninit: clobber
 
 clean:;	if [ -f bin/build ]; then bin/build clobber; fi
 
