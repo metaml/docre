@@ -2,20 +2,21 @@
 module Main where
 
 import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, dropWhile, null, lookup)
+import Network.Socket hiding (recv)
 import qualified GHC.IO.Exception as Ex
 import qualified Data.HashMap.Strict as Map
 import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
-import Network.Socket hiding (recv)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
 import Data.Aeson.Types
 import Data.ByteString (concat, length, drop, null, ByteString)
 import Data.ByteString.Char8 (putStrLn, breakSubstring)
-import Data.Text (dropWhile, Text)
+import Data.Text (dropWhile)
 import Data.Text.Encoding (encodeUtf8)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
+import Network.Consul.DockerClient (registerService, deregisterService, mkConsulClient, mkRegisterService, mkDatacenter)
 
 main :: IO ()
 main = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
@@ -67,25 +68,22 @@ container2consul = forever $ do
                        Just e -> yield (e, status)
                                  
 consul :: Consumer (Object, Status) IO ()
-consul = forever $ do
-           (h, status) <- await
-           let (Just (String cid)) = Map.lookup "Id" h
-               (Just (String name)) = Map.lookup "Name" h
-               Just net = Map.lookup "NetworkSettings" h
-               (Just (String ip)) = ipAddress net
-               name' = dropWhile (\c -> c == '/') name
---           case status of
---             "start" -> lift $ undefined cid name' ip ["8080"]
---             "stop" -> lift $ undefined cid name' ["8080"]
---             _ -> lift $ return ()
-           lift $ print status >> print cid >> print name >> print ip
+consul = do
+  consulClient <- mkConsulClient
+  forever $ do
+    (h, status) <- await
+    let (Just (String cid)) = Map.lookup "Id" h
+        (Just (String name)) = Map.lookup "Name" h
+        Just net = Map.lookup "NetworkSettings" h
+        (Just (String ip)) = ipAddress net
+        name' = dropWhile (\c -> c == '/') name
+        service = mkRegisterService name' (PortNum 8080) ["proxy"]
+    _ <- case status of
+           "start" -> lift $ registerService consulClient service (Just (mkDatacenter "dev"))
+           "stop" -> lift $ deregisterService consulClient service
+           _ -> return ()
+    lift $ print status >> print cid >> print name >> print ip
 
-type Status' = Text
-type Cid' = Text
-type Name' = Text
-type Ip' = Text        
-type Services' = [Text]
-           
 event :: Socket -> IO ByteString
 event s = do
   sendAll s "GET /events HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"

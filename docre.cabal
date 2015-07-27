@@ -36,6 +36,7 @@ executable app
                , aeson == 0.9.*
                , bytestring == 0.10.*
                , consul-haskell == 0.2.*
+               , convertible == 1.1.*
                , http-client == 0.4.*
                , network == 2.6.*
                , pipes == 4.*

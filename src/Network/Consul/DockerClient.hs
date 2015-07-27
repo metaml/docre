@@ -1,16 +1,26 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
-module Network.Consul.DockerClient where
+module Network.Consul.DockerClient (registerService, deregisterService, mkConsulClient, mkRegisterService, mkDatacenter) where
 
 import System.Environment (lookupEnv)
-import Control.Monad.IO.Class (liftIO, MonadIO)
-import Data.Text (pack, Text)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Text (Text, pack)
 import Text.Read (readMaybe)
 import Data.Convertible (convert)
 import Network.Socket (PortNumber(..))
-import Network.HTTP.Client (defaultManagerSettings, newManager, Manager)
-import Network.Consul (initializeConsulClient)
-import Network.Consul.Types (ConsulClient(..), RegisterService(..))
+import Network.Consul.Types (ConsulClient(..), RegisterService(..), Datacenter(..))
+import qualified Network.Consul.Internal as I
+import qualified Network.Consul as C
 
+registerService :: ConsulClient -> RegisterService -> Maybe Datacenter -> IO ()
+registerService c s d = do
+  _ <- C.registerService c s d
+  return ()
+
+deregisterService :: ConsulClient -> RegisterService -> IO ()
+deregisterService cc rs = do
+  _ <- I.deregisterService (ccManager cc) (ccHostname cc) (ccPort cc) (rsName rs)
+  return ()
+         
 mkConsulClient :: MonadIO m => m ConsulClient
 mkConsulClient = do
   ch <- liftIO $ lookupEnv "CONSUL_HOST"
@@ -23,12 +33,13 @@ mkConsulClient = do
                            Just p' -> fromInteger p'
                            Nothing -> 8500
                Nothing -> 8500
-  initializeConsulClient host (PortNum port) Nothing
+  C.initializeConsulClient host (PortNum port) Nothing
 
 type Service = Text
-                         
-mkRegisterService :: Service -> PortNumber -> [Text] -> RegisterService
+type Tag = Text    
+
+mkRegisterService :: Service -> PortNumber -> [Tag] -> RegisterService
 mkRegisterService service (PortNum port) tags = RegisterService Nothing service tags (Just $ convert port) Nothing
 
-mkManager :: IO Manager
-mkManager = newManager defaultManagerSettings
+mkDatacenter :: Text -> Datacenter
+mkDatacenter dc = Datacenter dc

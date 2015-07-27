@@ -1,9 +1,7 @@
-import System.Exit (exitSuccess)
 import System.Environment (lookupEnv)
 import System.FilePath (dropExtension)
-import System.FSNotify (watchTree, withManager)
-import System.INotify
-import Control.Concurrent (forkIO, threadDelay)
+import System.INotify (Event(..), EventVariety(..), addWatch, removeWatch, withINotify)
+import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
 import Data.Char (toLower)
 import Data.List.Split (splitOn)
