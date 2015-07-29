@@ -10,7 +10,8 @@ build:
 	mkdir -p bin
 	cp dist/build/build/build bin
 
-update:; cabal install --only-dependencies
+update:
+	cabal install --only-dependencies
 
 init: clobber
 	cd lib/dev && make -f init-dev.make dev

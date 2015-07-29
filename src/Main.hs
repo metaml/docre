@@ -9,14 +9,15 @@ import Control.Exception (try, throwIO)
 import Control.Monad (unless, forever)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
-import Data.Aeson.Types
+import Data.Aeson.Types (Object, Value(..))
 import Data.ByteString (concat, length, drop, null, ByteString)
 import Data.ByteString.Char8 (putStrLn, breakSubstring)
-import Data.Text (dropWhile)
+import Data.Text (dropWhile, replace)
 import Data.Text.Encoding (encodeUtf8)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
-import Network.Consul.DockerClient (registerService, deregisterService, mkConsulClient, mkRegisterService, mkDatacenter)
+import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))    
+import Network.Consul.DockerClient (registerService, deregisterService, registerNode, deregisterNode, mkConsulClient)
 
 main :: IO ()
 main = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
@@ -37,7 +38,6 @@ docker = forever $ do
 json2event :: Pipe ByteString Event IO ()
 json2event = forever $ do
                r <- await
-               lift $ putStrLn "- json2event:" >> print r
                let j = last (tokenize "\r\n" r)
                case (decodeStrict j) of
                  Nothing -> lift $ putStrLn "error in json2event:" >> print j
@@ -55,7 +55,6 @@ id2container = forever $ do
                            (eId, status) <- await
                            lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1", "\r\n\r\n"]
                            r <- lift $ recv s 4096 -- r: http response
-                           lift $ putStrLn "- id2container:" >> print r
                            yield $ (r, status)
                  lift $ sClose s
 
@@ -76,13 +75,18 @@ consul = do
         (Just (String name)) = Map.lookup "Name" h
         Just net = Map.lookup "NetworkSettings" h
         (Just (String ip)) = ipAddress net
-        name' = dropWhile (\c -> c == '/') name
-        service = mkRegisterService name' (PortNum 8080) ["proxy"]
-    _ <- case status of
-           "start" -> lift $ registerService consulClient service (Just (mkDatacenter "dev"))
-           "stop" -> lift $ deregisterService consulClient service
-           _ -> return ()
-    lift $ print status >> print cid >> print name >> print ip
+        name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+    r <- case status of
+           "start" -> do
+             let service = Service cid name' ["http"] Nothing Nothing
+                 node = RegisterNode (Just $ Datacenter "dev") name' ip (Just service) Nothing
+             lift $ registerNode consulClient node
+           "stop" -> do
+             let node = DeregisterNode (Just $ Datacenter "dev") name'
+             lift $ deregisterNode consulClient node
+           _ -> return False
+    lift $ print status >> print cid >> print name >> print ip >> print r
+    return r
 
 event :: Socket -> IO ByteString
 event s = do
