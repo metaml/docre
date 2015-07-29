@@ -6,22 +6,20 @@ module Network.Consul.DockerClient (registerService
                                    , mkConsulClient)
 where
 
+import Prelude hiding (concat)
 import qualified Data.ByteString.Lazy as BL    
 import qualified Data.ByteString.Internal as B
 import qualified Network.Consul.Internal as I
 import qualified Network.Consul.Types as C    
 import qualified Network.Consul as C
-import Prelude hiding (concat)  
 import System.Environment (lookupEnv)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Text (Text, concat, pack, unpack)
 import Text.Read (readMaybe)
 import Data.Maybe (isJust)
-import Data.Convertible (convert)
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), (.:), (.=), object, encode)
+import Data.Aeson (encode)
 import Network.Socket (PortNumber(..))
-import Network.HTTP.Client (Request(..), RequestBody(..)
-                           , parseUrl, withResponse, responseStatus)
+import Network.HTTP.Client (Request(..), RequestBody(..), parseUrl, withResponse, responseStatus)
 import Network.HTTP.Types.Status (status200)
 import Data.Consul
     
@@ -63,17 +61,11 @@ mkConsulClient = do
                            Just p' -> fromInteger p'
                            Nothing -> 8500
                Nothing -> 8500
-  C.initializeConsulClient host (PortNum port) Nothing
+  C.initializeConsulClient host port Nothing
 
-type NodeName = Text
-type Address = Text      
-type Sid = Text   
-type ServiceName = Text
-type Tag = Text
-type Port = Int
-       
+-- | code stolen from consul-haskell to get external node registration
 mkRequest :: MonadIO m => Text -> PortNumber -> Text -> Maybe Text -> Maybe B.ByteString -> Bool -> Maybe C.Datacenter -> m Request
-mkRequest hostname (PortNum portNumber) endpoint query body wait dc = do
+mkRequest hostname portNumber endpoint query body wait dc = do
   let baseUrl = concat ["http://",hostname,":", pack $ show portNumber, endpoint, needQueryString
                        , maybe "" id query, prefixAnd, maybe "" (\(C.Datacenter x) -> concat ["dc=", x]) dc]
   initReq <- liftIO $ parseUrl $ unpack baseUrl
