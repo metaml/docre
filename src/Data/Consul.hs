@@ -3,8 +3,6 @@ module Data.Consul where
 
 import GHC.Generics (Generic)
 import Data.Data (Typeable, Data)
-import Network.HTTP.Client (Manager)
-import Network.Socket (PortNumber)    
 import Data.Aeson (FromJSON(..), ToJSON(..), genericToJSON, genericParseJSON)
 import Data.Aeson.Types (defaultOptions, fieldLabelModifier)
 import Data.Text (Text)

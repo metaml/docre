@@ -29,11 +29,12 @@ main :: IO ()
 main = do
   e <- runEitherT $ forever $ do
          sock <- lift $ doesFileExist "/var/run/docker.sock"
+         lift $ print sock
          _ <- lift $ threadDelay 1000000
-         when (sock) $ left ()
+         when (sock == True) $ left ()
   case e of
-    Left  _ -> main
-    Right _ -> dockerListener
+    Left  _ -> dockerListener
+    Right _ -> main
     
 dockerListener :: IO ()
 dockerListener = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul

@@ -26,16 +26,14 @@ main = shakeArgs shakeOptions $ do
   "shake" ~> do
     hs <- getDirectoryFiles "lib/shake" ["//*.hs"]
     need $ map (\(h,_) -> "bin" </> dropExtension h) $ hns hs
-  "bin/*" %> \bin -> do -- /* is not cool
+  "bin/*" %> \bin -> do -- @todo: "/*" is not cool
     let h = "lib/shake" </> takeFileName bin
     cmd "cabal exec -- ghc -o" [bin, h <.> "hs"]
   "clean" ~> do
-    removeFilesAfter "lib/shake" ["//*.o","//*.hi"]
     removeFilesAfter "dist" ["//*"]
   "clobber" ~> do
     need ["clean"]
-    removeFilesAfter "dist" ["//*"]
-    removeFilesAfter "bin" ["//*"]
+    removeFilesAfter "bin" ["build"]
 
 type ShakeSrc = String
 type Name = String

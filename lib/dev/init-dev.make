@@ -7,7 +7,9 @@ CABAL_INSTALL_VER = 1.22.6.0
 SHELL := /bin/bash
 PATH := /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-dev: init ghc cabal sandbox
+dev: init ghc-chain
+
+ghc-chain: ghc cabal sandbox
 
 undev:
 	rm -rf ~/.cabal
