@@ -6,6 +6,7 @@ import Network.Socket hiding (recv)
 -- import qualified GHC.IO.Exception as Ex
 -- import Control.Exception (try, throwIO)
 import qualified Data.HashMap.Strict as Map
+import System.Directory (doesFileExist)    
 import Control.Monad (forever)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
@@ -19,9 +20,23 @@ import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))    
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
+import Control.Concurrent (threadDelay)    
+import Control.Monad (when)
+import Control.Monad.Trans ()
+import Control.Monad.Trans.Either
 
 main :: IO ()
-main = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
+main = do
+  e <- runEitherT $ forever $ do
+         sock <- lift $ doesFileExist "/var/run/docker.sock"
+         _ <- lift $ threadDelay 1000000
+         when (sock) $ left ()
+  case e of
+    Left  _ -> main
+    Right _ -> dockerListener
+    
+dockerListener :: IO ()
+dockerListener = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
 
 type Status = ByteString
 type Cid = ByteString

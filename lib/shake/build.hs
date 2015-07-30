@@ -20,7 +20,7 @@ main = shakeArgs shakeOptions $ do
     liftIO $ watch ds
   "run" ~> do
     need ["app"]
-    cmd "dist/build/app/app"
+    cmd "dist/build/app/app +RTS -N4"
   "update" ~> do
     cmd "cabal install --only-dependencies"
   "shake" ~> do
