@@ -3,21 +3,22 @@ module Main where
 
 import Prelude hiding (putStrLn, getLine, words, lines, concat, length, drop, dropWhile, null, lookup)
 import Network.Socket hiding (recv)
-import qualified GHC.IO.Exception as Ex
+-- import qualified GHC.IO.Exception as Ex
+-- import Control.Exception (try, throwIO)
 import qualified Data.HashMap.Strict as Map
-import Control.Exception (try, throwIO)
-import Control.Monad (unless, forever)
+import Control.Monad (forever)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
 import Data.Aeson.Types (Object, Value(..))
-import Data.ByteString (concat, length, drop, null, ByteString)
-import Data.ByteString.Char8 (putStrLn, breakSubstring)
+import Data.ByteString (concat, ByteString)
+import Data.ByteString.Char8 (putStrLn, pack, unpack)
 import Data.Text (dropWhile, replace)
 import Data.Text.Encoding (encodeUtf8)
+import Text.Regex (mkRegex, splitRegex)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))    
-import Network.Consul.DockerClient (registerService, deregisterService, registerNode, deregisterNode, mkConsulClient)
+import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
 
 main :: IO ()
 main = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
@@ -38,8 +39,9 @@ docker = forever $ do
 json2event :: Pipe ByteString Event IO ()
 json2event = forever $ do
                r <- await
-               let j = last (tokenize "\r\n" r)
-               case (decodeStrict j) of
+               let j = last $ filter (\c-> c /= "") $ (splitRegex (mkRegex "[ \t\r\n]+") r') where r' = unpack r
+               lift $ print j
+               case (decodeStrict $ pack j) of
                  Nothing -> lift $ putStrLn "error in json2event:" >> print j
                  Just e -> yield e
 
@@ -61,7 +63,10 @@ id2container = forever $ do
 container2consul :: Pipe (Cid, Status) (Object, Status) IO ()
 container2consul = forever $ do
                      (r, status) <- await  -- r: http response
-                     let o :: Maybe Object = decodeStrict (last $ tokenize "\r\n" r)
+                     let o :: Maybe Object = decodeStrict json where
+                                               json = pack $ last $ init $ filter (\c -> c /= "")
+                                                      (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
+                     lift $ print o                          
                      case o of
                        Nothing -> lift $ putStrLn "error in container2consul"
                        Just e -> yield (e, status)
@@ -85,7 +90,7 @@ consul = do
              let node = DeregisterNode (Just $ Datacenter "dev") name'
              lift $ deregisterNode consulClient node
            _ -> return False
-    lift $ print status >> print cid >> print name >> print ip >> print r
+    lift $ print status >> print cid >> print name >> print ip
     return r
 
 event :: Socket -> IO ByteString
@@ -103,19 +108,3 @@ unixSocket = do
 ipAddress :: Value -> Maybe Value
 ipAddress (Object obj) = Map.lookup "IPAddress" obj
 ipAddress _ = Nothing
-
--- @todo: refactor
-tokenize :: ByteString -> ByteString -> [ByteString]
-tokenize d bs = filter (\e -> e /= "") $ h : if null t then [] else tokenize d (drop (length h) t)
-                                             where (h, t) = breakSubstring d bs
-
--- | below: only for reference
-consul' :: Consumer (Maybe Event) IO ()
-consul' = do
-  ev <- await
-  x <- lift $ try $ print ev
-  case x of
-    Left e@(Ex.IOError {Ex.ioe_type = t}) ->
-      lift $ unless (Ex.ResourceVanished == t) $ throwIO e -- gracefully terminate on a broken pipe error
-    Right () ->
-      consul'
