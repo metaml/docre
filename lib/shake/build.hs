@@ -51,4 +51,4 @@ watch fs = withINotify $ \inotify -> do
   _ <- ($) forever $ threadDelay (3600*1000000)
   mapM_ (\wd -> removeWatch wd) wds
   where handleEvent :: FilePath -> Event -> IO ()
-        handleEvent _ _ = cmd "cabal build app" 
+        handleEvent _ _ = cmd "cabal build app"

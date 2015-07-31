@@ -10,15 +10,17 @@ import System.Directory (doesFileExist)
 import Control.Monad (forever)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict)
-import Data.Aeson.Types (Object, Value(..))
+import Data.Foldable (forM_)
 import Data.ByteString (concat, ByteString)
 import Data.ByteString.Char8 (putStrLn, pack, unpack)
-import Data.Text (dropWhile, replace)
+import Data.Text (Text, append, dropWhile, replace, splitOn)
 import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..))
-import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))    
+import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..)
+                   ,ConsulStartResponse(..), ConsulStartNetworkSettings(..))    
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
 import Control.Concurrent (threadDelay)    
 import Control.Monad (when)
@@ -76,37 +78,33 @@ id2container = forever $ do
                            yield $ (r, status)
                  lift $ sClose s
 
-container2consul :: Pipe (Cid, Status) (Object, Status) IO ()
+container2consul :: Pipe (ByteString, Status) (ByteString, Status) IO ()
 container2consul = forever $ do
                      (r, status) <- await  -- r: http response
-                     let o :: Maybe Object = decodeStrict json where
-                                               json = pack $ last $ init $ filter (\c -> c /= "")
-                                                      (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
-                     lift $ print o                          
-                     case o of
-                       Nothing -> lift $ putStrLn "error in container2consul"
-                       Just e -> yield (e, status)
+                     let json :: ByteString = pack $ last $ init $ filter (\c -> c /= "")
+                                              (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
+                     lift $ print json                          
+                     yield (json, status)
                                  
-consul :: Consumer (Object, Status) IO ()
+consul :: Consumer (ByteString, Status) IO ()
 consul = do
   consulClient <- mkConsulClient
   forever $ do
-    (h, status) <- await
-    let (Just (String cid)) = Map.lookup "Id" h
-        (Just (String name)) = Map.lookup "Name" h
-        Just net = Map.lookup "NetworkSettings" h
-        (Just (String ip)) = ipAddress net
-        name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+    (json, status) <- await
     r <- case status of
            "start" -> do
-             let service = Service cid name' ["http"] Nothing Nothing
-                 node = RegisterNode (Just $ Datacenter "dev") name' ip (Just service) Nothing
-             lift $ registerNode consulClient node
+             -- @todo: bug--csr = Nothing but json looks legit                       
+             let csr :: Maybe ConsulStartResponse = decodeStrict json
+                 nodes = mkRegisterNodes csr
+             lift $ print csr
+             case nodes of
+               Just ns -> forM_ ns (\n -> lift $ registerNode consulClient n) >> return True
+               Nothing -> return False
            "stop" -> do
-             let node = DeregisterNode (Just $ Datacenter "dev") name'
+             let node = undefined -- mkDeregisterNode $ json
              lift $ deregisterNode consulClient node
+             return True                  
            _ -> return False
-    lift $ print status >> print cid >> print name >> print ip
     return r
 
 event :: Socket -> IO ByteString
@@ -121,6 +119,35 @@ unixSocket = do
   connect s $ SockAddrUnix "/var/run/docker.sock"
   return s
 
-ipAddress :: Value -> Maybe Value
-ipAddress (Object obj) = Map.lookup "IPAddress" obj
-ipAddress _ = Nothing
+mkRegisterNodes :: Maybe ConsulStartResponse -> Maybe [RegisterNode]
+mkRegisterNodes (Just res) = let name = _csrName res
+                                 name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+                                 net = _csrNetworkSettings res :: ConsulStartNetworkSettings
+                                 ip = _csnsIPAddress net
+                                 datacenter = Just $ Datacenter "dev"
+                                 service = mkService res
+                             in Just $ [RegisterNode datacenter name' ip (Just service) Nothing]
+mkRegisterNodes Nothing = Nothing
+
+mkDeregisterNode :: ConsulStartResponse -> DeregisterNode
+mkDeregisterNode res = let name = _csrName res
+                           name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+                       in DeregisterNode (Just $ Datacenter "dev") name'
+                                   
+mkService :: ConsulStartResponse -> Service
+mkService res = let cid = _csrId res
+                    name = _csrName res
+                    net = _csrNetworkSettings res
+                    ports = _csnsPorts net
+                    name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+                    sid = append cid $ append "-" name'
+                in Service sid name' (Map.keys ports) Nothing (Just 8080)
+
+port2int :: Text -> Maybe Int
+port2int sport = do
+  let p = head $ splitOn "/" sport
+      port = decimal p
+  case port of
+    Right (p', _) -> Just p'
+    Left _ -> Nothing
+              
