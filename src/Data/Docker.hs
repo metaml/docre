@@ -27,32 +27,57 @@ data StartState = StartState {_ssRunning :: Bool
                              ,_ssFinishedAT :: Text
                              } deriving (Eq, Show, Typeable, Data, Generic)
                       
-data StartNetworkSettings = StartNetworkSettings {_csnsGateway :: Text
-                                                 ,_csnsIPAddress :: Text
-                                                 ,_csnsIPPrefixLen :: Int
-                                                 ,_csnsMacAddress :: Text
-                                                 ,_csnsNetworkID :: Text
-                                                 ,_csnsPortMapping :: Maybe Text
-                                                 ,_csnsPorts :: Object
-                                                 ,_csnsName :: Text
+data StartNetworkSettings = StartNetworkSettings {_snsBridge :: Text
+                                                 ,_snsEndpointID :: Text
+                                                 ,_snsGateway :: Text
+                                                 ,_snsGlobalIPv6Address :: Text
+                                                 ,_snsGlobalIpv6PrefixLen :: Int
+                                                 ,_snnHairpinMode :: Bool
+                                                 ,_snsIPAddress :: Text
+                                                 ,_snsIPPrefixLen :: Int
+                                                 ,_snsLinklIPv6Address :: Text
+                                                 , _snsLinklIpv6PrefixLen :: Int
+                                                 ,_snsMacAddress :: Text
+                                                 ,_snsNetworkID :: Text
+                                                 ,_snsPortMapping :: Maybe Text                                                                                                        ,_snsPorts :: Object
                                                  } deriving (Eq, Show, Typeable, Data, Generic)
                           
-data StartConfig = StartConfig {_cscHostname :: Text
-                               ,_cscDomain :: Text
-                               ,_cscExposedPorts :: Object
-                               ,_cscEnv :: Array
-                               ,_cscImage :: Text
+data StartConfig = StartConfig {_scHostname :: Text
+                               ,_scDomain :: Text
+                               ,_scExposedPorts :: Object
+                               ,_scEnv :: Array
+                               ,_scImage :: Text
                                } deriving (Eq, Show, Typeable, Data, Generic)
                                                         
-data StartResponse = StartResponse {_csrId :: Text
-                                   ,_csrName :: Text
-                                   ,_csrState :: StartState
-                                   ,_csrNetworkSettings :: StartNetworkSettings
-                                   ,_csrConfig :: StartConfig
+data StartResponse = StartResponse {_srId :: Text
+                                   ,_srCreated :: Text
+                                   ,_srPath :: Text
+                                   ,_srImage :: Text
+                                   ,_srResolveConfPath :: Text
+                                   ,_srHostnamePath :: Text                                                          
+                                   ,_srHostsPath :: Text                                                          
+                                   ,_srLogPath :: Text
+                                   ,_srName :: Text
+                                   ,_srRestartCount:: Int
+                                   ,_srDrive :: Int                                                      
+                                   ,_srExecDrive :: Int
+                                   ,_srMountLabel :: Int
+                                   ,_srProcessLabel :: Int
+                                   ,_srVolumes :: Object
+                                   ,_srVolumesRW :: Object
+                                   ,_srAppArmorProfiled :: Text
+                                   ,_srExecIds :: Maybe Text
+                                   ,_srwNetworkDisabled :: Bool
+                                   ,_srwMacAddress :: Text
+                                   ,_srOnBuild :: Maybe Text
+                                   ,_srLebels :: Object
+                                   ,_srState :: StartState
+                                   ,_srNetworkSettings :: StartNetworkSettings
+                                   ,_srConfig :: StartConfig
                                    } deriving (Eq, Show, Typeable, Data, Generic)
 
 instance ToJSON Event where
-  toJSON = genericToJSON defaultOptions {fieldLabelModifier = map toLower . (drop 1)}
+  toJSON = genericToJSON defaultOptions {fieldLabelModifier = map toLower . (drop 2)}
 instance FromJSON Event where
   parseJSON = genericParseJSON defaultOptions {fieldLabelModifier = map toLower . (drop 2)}
 

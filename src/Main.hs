@@ -9,7 +9,7 @@ import qualified Data.HashMap.Strict as Map
 import System.Directory (doesFileExist)    
 import Control.Monad (forever)
 import Network.Socket.ByteString (recv, sendAll)
-import Data.Aeson (decode, decodeStrict, decodeStrict')
+import Data.Aeson (decodeStrict)
 import Data.Foldable (forM_)
 import Data.ByteString (concat, ByteString)
 import Data.ByteString.Char8 (putStrLn, pack, unpack)
@@ -56,8 +56,8 @@ json2event :: Pipe ByteString Event IO ()
 json2event = forever $ do
                r <- await
                let j = last $ filter (\c-> c /= "") $ (splitRegex (mkRegex "[ \t\r\n]+") r') where r' = unpack r
-               case (decodeStrict' $ pack j) :: Maybe Event of
-                 Just event -> yield event
+               case (decodeStrict $ pack j) :: Maybe Event of
+                 Just ev -> yield ev
                  Nothing -> lift $ putStr "error in json2event j=:" >> print j
 
 event2id :: Pipe Event (ByteString, Status) IO ()
@@ -119,25 +119,25 @@ unixSocket = do
   return s
 
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
-mkRegisterNodes (Just res) = let name = _csrName res
+mkRegisterNodes (Just res) = let name = _srName res
                                  name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
-                                 net = _csrNetworkSettings res :: StartNetworkSettings
-                                 ip = _csnsIPAddress net
+                                 net = _srNetworkSettings res :: StartNetworkSettings
+                                 ip = _snsIPAddress net
                                  datacenter = Just $ Datacenter "dev"
                                  service = mkService res
                              in Just $ [RegisterNode datacenter name' ip (Just service) Nothing]
 mkRegisterNodes Nothing = Nothing
 
 mkDeregisterNode :: StartResponse -> DeregisterNode
-mkDeregisterNode res = let name = _csrName res
+mkDeregisterNode res = let name = _srName res
                            name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
                        in DeregisterNode (Just $ Datacenter "dev") name'
                                    
 mkService :: StartResponse -> Service
-mkService res = let cid = _csrId res
-                    name = _csrName res
-                    net = _csrNetworkSettings res
-                    ports = _csnsPorts net
+mkService res = let cid = _srId res
+                    name = _srName res
+                    net = _srNetworkSettings res
+                    ports = _snsPorts net
                     name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
                     sid = append cid $ append "-" name'
                 in Service sid name' (Map.keys ports) Nothing (Just 8080)
