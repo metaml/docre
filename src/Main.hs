@@ -9,7 +9,7 @@ import qualified Data.HashMap.Strict as Map
 import System.Directory (doesFileExist)    
 import Control.Monad (forever)
 import Network.Socket.ByteString (recv, sendAll)
-import Data.Aeson (decodeStrict)
+import Data.Aeson (decodeStrict, eitherDecodeStrict)
 import Data.Foldable (forM_)
 import Data.ByteString (concat, ByteString)
 import Data.ByteString.Char8 (putStrLn, pack, unpack)
@@ -91,11 +91,12 @@ consul = do
     (json, status) <- await
     r <- case status of
            "start" -> do
-             -- @todo: bug--csr = Nothing but json looks legit                       
+             -- @todo: bug--csr = Nothing but json looks legit
              let csr :: Maybe StartResponse = decodeStrict json
                  nodes = mkRegisterNodes csr
-             lift $ putStr "consul: json=" >> putStrLn json
-             lift $ putStr "consul: csr=" >> print csr
+                 debug :: Either String StartResponse = eitherDecodeStrict json
+             lift $ putStr "consul: json=" >> putStrLn json >> putStr "consul: csr=" >> print csr
+             lift $ putStr "consul: debug=" >> print debug
              case nodes of
                Just ns -> forM_ ns (\n -> lift $ registerNode consulClient n) >> return True
                Nothing -> return False
@@ -118,6 +119,11 @@ unixSocket = do
   connect s $ SockAddrUnix "/var/run/docker.sock"
   return s
 
+mkDeregisterNode :: StartResponse -> DeregisterNode
+mkDeregisterNode res = let name = _srName res
+                           name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+                       in DeregisterNode (Just $ Datacenter "dev") name'
+         
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
 mkRegisterNodes (Just res) = let name = _srName res
                                  name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
@@ -128,11 +134,6 @@ mkRegisterNodes (Just res) = let name = _srName res
                              in Just $ [RegisterNode datacenter name' ip (Just service) Nothing]
 mkRegisterNodes Nothing = Nothing
 
-mkDeregisterNode :: StartResponse -> DeregisterNode
-mkDeregisterNode res = let name = _srName res
-                           name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
-                       in DeregisterNode (Just $ Datacenter "dev") name'
-                                   
 mkService :: StartResponse -> Service
 mkService res = let cid = _srId res
                     name = _srName res
