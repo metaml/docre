@@ -107,7 +107,7 @@ data StartNetworkSettings = StartNetworkSettings {_snsBridge :: Text
                                                  ,_snsMacAddress :: Text
                                                  ,_snsNetworkID :: Text
                                                  ,_snsPortMapping :: Maybe Object
-                                                 ,_snsPorts :: Object
+                                                 ,_snsPorts :: Maybe Object
                                                  ,_snsSandboxKey :: Text
                                                  ,_snsSecondaryIPAddresses :: Maybe Object
                                                  ,_snsSecondaryIPv6Addresses :: Maybe Object

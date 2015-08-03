@@ -8,23 +8,24 @@ import Network.Socket hiding (recv)
 import qualified Data.HashMap.Strict as Map
 import System.Directory (doesFileExist)    
 import Control.Monad (forever)
+import Control.Concurrent (threadDelay)    
+import Control.Monad (when)
+import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict, eitherDecodeStrict)
 import Data.Foldable (forM_)
+import Data.Maybe (fromJust)
+import Data.Either (rights)
 import Data.ByteString (concat, ByteString)
 import Data.ByteString.Char8 (putStrLn, pack, unpack)
 import Data.Text (Text, append, dropWhile, replace, splitOn)
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
 import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
 import Data.Docker (Event(..), StartResponse(..), StartNetworkSettings(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
-import Control.Concurrent (threadDelay)    
-import Control.Monad (when)
-import Control.Monad.Trans ()
-import Control.Monad.Trans.Either
 
 main :: IO ()
 main = do
@@ -91,19 +92,15 @@ consul = do
     (json, status) <- await
     r <- case status of
            "start" -> do
-             -- @todo: bug--csr = Nothing but json looks legit
-             let csr :: Maybe StartResponse = decodeStrict json
-                 nodes = mkRegisterNodes csr
-                 debug :: Either String StartResponse = eitherDecodeStrict json
-             lift $ putStr "consul: json=" >> putStrLn json >> putStr "consul: csr=" >> print csr
-             lift $ putStr "consul: debug=" >> print debug
+             let nodes = mkRegisterNodes $ decodeStrict json
+             lift $ putStr "consul: nodes=" >> print  nodes
              case nodes of
-               Just ns -> forM_ ns (\n -> lift $ registerNode consulClient n) >> return True
+               Just ns -> forM_ ns (\n -> lift $ putStr "n=" >> print n >> registerNode consulClient n) >> return True
                Nothing -> return False
            "stop" -> do
              -- let node = mkDeregisterNode $ 
              -- lift $ deregisterNode consulClient node
-             return True                  
+             return True
            _ -> return False
     return r
 
@@ -120,34 +117,27 @@ unixSocket = do
   return s
 
 mkDeregisterNode :: StartResponse -> DeregisterNode
-mkDeregisterNode res = let name = _srName res
-                           name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
-                       in DeregisterNode (Just $ Datacenter "dev") name'
+mkDeregisterNode res = let name' = _srName res
+                           name = replace "_" "-" (dropWhile (\c -> c == '/') name')
+                       in DeregisterNode (Just $ Datacenter "dev") name
          
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
-mkRegisterNodes (Just res) = let name = _srName res
-                                 name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
+mkRegisterNodes (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
                                  net = _srNetworkSettings res :: StartNetworkSettings
                                  ip = _snsIPAddress net
-                                 datacenter = Just $ Datacenter "dev"
-                                 service = mkService res
-                             in Just $ [RegisterNode datacenter name' ip (Just service) Nothing]
+                                 portObjs = Map.keys $ _snsPorts net
+                                 ports = map (\pair -> fst pair) (rights ports')
+                                         where ports' = map (\p -> decimal p) $ map (\p -> head (splitOn "/" p)) portObjs
+                                 dc = Just $ Datacenter "dev"
+                             in Just $ map (\port -> RegisterNode dc name ip (Just (mkService res port)) Nothing) ports
 mkRegisterNodes Nothing = Nothing
 
-mkService :: StartResponse -> Service
-mkService res = let cid = _srId res
-                    name = _srName res
-                    net = _srNetworkSettings res
-                    ports = _snsPorts net
-                    name' = replace "_" "-" (dropWhile (\c -> c == '/') name)
-                    sid = append cid $ append "-" name'
-                in Service sid name' (Map.keys ports) Nothing (Just 8080)
-
-port2int :: Text -> Maybe Int
-port2int sport = do
-  let p = head $ splitOn "/" sport
-      port = decimal p
-  case port of
-    Right (p', _) -> Just p'
-    Left _ -> Nothing
+mkService :: StartResponse -> Int -> Service
+mkService res port = let cid = _srId res
+                         net = _srNetworkSettings res
+                         ports = _snsPorts net
+                         name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
+                         sid = append cid $ append "-" $ append name $ append "-" (decodeUtf8 (pack $ show port))
+                     in Service sid name (Map.keys ports) Nothing (Just port)
+  
               
