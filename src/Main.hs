@@ -12,11 +12,11 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
-import Data.Aeson (Object, decodeStrict)
+import Data.Aeson (Object, decodeStrict, eitherDecodeStrict)
 import Data.Foldable (forM_)
 import Data.Either (rights)
 import Data.ByteString (ByteString, concat)
-import Data.ByteString.Char8 (pack, unpack)
+import Data.ByteString.Char8 (pack, unpack, putStrLn)
 import Data.Text (append, dropWhile, replace, splitOn)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
@@ -71,6 +71,7 @@ id2container = forever $ do
                  s <- lift $ unixSocket
                  _ <- ($) forever $ do
                            (eId, status) <- await
+                           lift $ putStr "id2container: eId=" >> print eId
                            lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1", "\r\n\r\n"]
                            r <- lift $ recv s 4096 -- r: http response
                            yield $ (r, status)
@@ -81,7 +82,7 @@ container2consul = forever $ do
                      (r, status) <- await  -- r: http response
                      let json :: ByteString = pack $ last $ init $ filter (\c -> c /= "")
                                               (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
-                     lift $ print json                          
+                     lift $ putStr "container2consul: json=" >> print json
                      yield (json, status)
                                  
 consul :: Consumer (ByteString, Status) IO ()
@@ -89,10 +90,13 @@ consul = do
   consulClient <- mkConsulClient
   forever $ do
     (json, status) <- await
+    lift $ putStr "consul: json=" >> putStrLn json
     r <- case status of
            "start" -> do
              let nodes = mkRegisterNodes $ decodeStrict json
-             lift $ putStr "consul: nodes=" >> print  nodes
+                 debug = eitherDecodeStrict json :: Either String StartResponse
+             lift $ putStr "consul: nodes=" >> print nodes
+             lift $ putStr "consul: debug=" >> print debug
              case nodes of
                Just ns -> forM_ ns (\n -> lift $ putStr "n=" >> print n >> registerNode consulClient n) >> return True
                Nothing -> return False

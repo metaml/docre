@@ -35,9 +35,9 @@ data StartRestartPolicy = StartRestartPolicy {_srpName :: Text
                                              ,_srpMaximumRetryCount :: Int
                                              } deriving (Eq, Show, Typeable, Data, Generic)
 
-data StartHostConfig = StartHostConfig{_shcBinds :: Maybe Object
+data StartHostConfig = StartHostConfig{_shcBinds :: Maybe Array
                                       ,_shcContainerIDFile :: Text
-                                      ,_shcLxcConf :: Array
+                                      ,_shcLxcConf :: Maybe Array
                                       ,_shcMemory :: Int
                                       ,_shcMemorySwap :: Int
                                       ,_shcCpuShares :: Int
@@ -54,8 +54,8 @@ data StartHostConfig = StartHostConfig{_shcBinds :: Maybe Object
                                       ,_shcDns :: Maybe Object
                                       ,_shcDnsSearch :: Maybe Object
                                       ,_shcExtraHosts :: Maybe Object
-                                      ,_shcVolumesFrom :: Maybe Object
-                                      ,_shcDevices :: Array
+                                      ,_shcVolumesFrom :: Maybe Array
+                                      ,_shcDevices :: Maybe Array
                                       ,_shcNetworkMode :: Text
                                       ,_shcIpcMode :: Text
                                       ,_shcPidMode :: Text
@@ -130,8 +130,8 @@ data StartResponse = StartResponse {_srId :: Text
                                    ,_srExecDriver :: Text
                                    ,_srMountLabel :: Text
                                    ,_srProcessLabel :: Text
-                                   ,_srVolumes :: Maybe Object
-                                   ,_srVolumesRW :: Maybe Object
+                                   ,_srVolumes :: Object
+                                   ,_srVolumesRW :: Object
                                    ,_srAppArmorProfile :: Text
                                    ,_srExecIDs :: Maybe Text
                                    ,_srHostConfig :: StartHostConfig
