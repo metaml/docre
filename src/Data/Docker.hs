@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, DeriveGeneric, OverloadedStrings #-}
-module Data.Docker (Event(..), StartResponse(..), StartConfig(..), StartNetworkSettings(..), StartState(..)) where
+module Data.Docker (Event(..), StartResponse(..), StopResponse(..), StartConfig(..), StartNetworkSettings(..), StartState(..)) where
 
 import Prelude hiding (id)
 import GHC.Generics (Generic)
@@ -178,3 +178,32 @@ instance ToJSON StartResponse where
 instance FromJSON StartResponse where
   parseJSON = genericParseJSON defaultOptions {fieldLabelModifier = drop 3}
                                            
+data StopResponse = StopResponse {_stId :: Text
+                                  ,_stCreated :: Text
+                                  ,_stPath :: Text
+                                  ,_stArgs :: Array
+                                  ,_stState :: StartState
+                                  ,_stImage :: Text
+                                  ,_stNetworkSettings :: StartNetworkSettings
+                                  ,_stResolvConfPath :: Text
+                                  ,_stHostnamePath :: Text                                                          
+                                  ,_stHostsPath :: Text                                                          
+                                  ,_stLogPath :: Text
+                                  ,_stName :: Text
+                                  ,_stRestartCount:: Int
+                                  ,_stDriver :: Text
+                                  ,_stExecDriver :: Text
+                                  ,_stMountLabel :: Text
+                                  ,_stProcessLabel :: Text
+                                  ,_stVolumes :: Maybe Object
+                                  ,_stVolumesRW :: Maybe Object
+                                  ,_stAppArmorProfile :: Text
+                                  ,_stExecIDs :: Maybe Text
+                                  ,_stHostConfig :: StartHostConfig
+                                  ,_stConfig :: StartConfig
+                                  } deriving (Eq, Show, Typeable, Data, Generic)
+
+instance ToJSON StopResponse where
+  toJSON = genericToJSON defaultOptions {fieldLabelModifier = drop 3}
+instance FromJSON StopResponse where
+  parseJSON = genericParseJSON defaultOptions {fieldLabelModifier = drop 3}

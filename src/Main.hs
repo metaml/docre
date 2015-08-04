@@ -22,7 +22,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
 import Pipes (Consumer, Producer, Pipe, (>->), await, yield, runEffect, lift)
-import Data.Docker (Event(..), StartResponse(..), StartNetworkSettings(..))
+import Data.Docker (Event(..), StartResponse(..), StopResponse(..), StartNetworkSettings(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
 
@@ -97,9 +97,10 @@ consul = do
                Just ns -> forM_ ns (\n -> lift $ putStr "n=" >> print n >> registerNode consulClient n) >> return True
                Nothing -> return False
            "stop" -> do
-             -- let node = mkDeregisterNode $ 
-             -- lift $ deregisterNode consulClient node
-             return True
+             let node = mkDeregisterNode $ decodeStrict json
+             case node of
+               Just n -> lift $ deregisterNode consulClient n >> return True
+               Nothing -> return False
            _ -> return False
     return r
 
@@ -115,10 +116,11 @@ unixSocket = do
   connect s $ SockAddrUnix "/var/run/docker.sock"
   return s
 
-mkDeregisterNode :: StartResponse -> DeregisterNode
-mkDeregisterNode res = let name' = _srName res
-                           name = replace "_" "-" (dropWhile (\c -> c == '/') name')
-                       in DeregisterNode (Just $ Datacenter "dev") name
+mkDeregisterNode :: Maybe StopResponse -> Maybe DeregisterNode
+mkDeregisterNode (Just res) = let name' = _stName res
+                                  name = replace "_" "-" (dropWhile (\c -> c == '/') name')
+                              in Just (DeregisterNode (Just $ Datacenter "dev") name)
+mkDeregisterNode Nothing = Nothing
 
 -- @todo: test docker containers with and without ports (external services)
 
