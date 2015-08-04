@@ -12,16 +12,16 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
-import Data.Aeson (decodeStrict)
+import Data.Aeson (Object, decodeStrict)
 import Data.Foldable (forM_)
 import Data.Either (rights)
-import Data.ByteString (concat, ByteString)
+import Data.ByteString (ByteString, concat)
 import Data.ByteString.Char8 (pack, unpack)
 import Data.Text (append, dropWhile, replace, splitOn)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
-import Pipes ((>->), await, yield, runEffect, lift, Consumer, Producer, Pipe)
+import Pipes (Consumer, Producer, Pipe, (>->), await, yield, runEffect, lift)
 import Data.Docker (Event(..), StartResponse(..), StartNetworkSettings(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
@@ -119,24 +119,33 @@ mkDeregisterNode :: StartResponse -> DeregisterNode
 mkDeregisterNode res = let name' = _srName res
                            name = replace "_" "-" (dropWhile (\c -> c == '/') name')
                        in DeregisterNode (Just $ Datacenter "dev") name
-         
+
+-- @todo: test docker containers with and without ports (external services)
+
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
 mkRegisterNodes (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
+                                 dc = Just $ Datacenter "dev"
                                  net = _srNetworkSettings res :: StartNetworkSettings
                                  ip = _snsIPAddress net
-                                 portObjs = Map.keys $ _snsPorts net
-                                 ports = map (\pair -> fst pair) (rights ports')
-                                         where ports' = map (\p -> decimal p) $ map (\p -> head (splitOn "/" p)) portObjs
-                                 dc = Just $ Datacenter "dev"
-                             in Just $ map (\port -> RegisterNode dc name ip (Just (mkService res port)) Nothing) ports
+                                 ps = ports (_snsPorts net)
+                             in case ps of
+                                  Just ps' -> Just $ map (\port -> RegisterNode dc name ip (mkService res port) Nothing) ps'
+                                  Nothing -> Just [RegisterNode dc name ip (mkService res 0) Nothing]
 mkRegisterNodes Nothing = Nothing
 
-mkService :: StartResponse -> Int -> Service
+mkService :: StartResponse -> Int -> Maybe Service
 mkService res port = let cid = _srId res
                          net = _srNetworkSettings res
-                         ports = _snsPorts net
                          name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
                          sid = append cid $ append "-" $ append name $ append "-" (decodeUtf8 (pack $ show port))
-                     in Service sid name (Map.keys ports) Nothing (Just port)
-  
-              
+                         ps = _snsPorts net
+                     in case ps of
+                          Just ps' -> Just (Service sid name (Map.keys ps') Nothing (Just port))
+                          Nothing -> Just (Service sid name [] Nothing Nothing)
+
+ports :: Maybe Object -> Maybe [Int]
+ports o = case o of
+            Just obj -> let ps = Map.keys obj
+                            ports' = map (\p -> decimal p) $ map (\p -> head (splitOn "/" p)) ps
+                        in return $ map (\pair -> fst pair) (rights ports')
+            Nothing -> Nothing

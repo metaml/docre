@@ -4,7 +4,7 @@ module Data.Consul where
 import GHC.Generics (Generic)
 import Data.Data (Typeable, Data)
 import Data.Aeson (FromJSON(..), ToJSON(..), genericToJSON, genericParseJSON)
-import Data.Aeson.Types (Object, Array, defaultOptions, fieldLabelModifier)
+import Data.Aeson.Types (defaultOptions, fieldLabelModifier)
 import Data.Text (Text)
 
 data RegisterNode = RegisterNode {_rnDatacenter :: Maybe Datacenter
