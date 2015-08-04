@@ -49,12 +49,12 @@ data StartHostConfig = StartHostConfig{_shcBinds :: Maybe Array
                                       ,_shcOomKillDisable :: Bool
                                       ,_shcPrivileged :: Bool
                                       ,_shcPortBindings :: Object
-                                      ,_shcLinks :: Maybe Object
+                                      ,_shcLinks :: Maybe [Text]
                                       ,_shcPublishAllPorts :: Bool
-                                      ,_shcDns :: Maybe Object
-                                      ,_shcDnsSearch :: Maybe Object
-                                      ,_shcExtraHosts :: Maybe Object
-                                      ,_shcVolumesFrom :: Maybe Array
+                                      ,_shcDns :: Maybe [Text]
+                                      ,_shcDnsSearch :: Maybe [Text]
+                                      ,_shcExtraHosts :: Maybe [Text]
+                                      ,_shcVolumesFrom :: Maybe [Text]
                                       ,_shcDevices :: Maybe Array
                                       ,_shcNetworkMode :: Text
                                       ,_shcIpcMode :: Text
@@ -86,7 +86,7 @@ data StartConfig = StartConfig {_scHostname :: Text
                                ,_scImage :: Text
                                ,_scVolumes :: Maybe Array
                                ,_scVolumeDriver :: Text
-                               ,_scEntrypoint :: Array
+                               ,_scEntrypoint :: [Text]
                                ,_scNetworkDisabled :: Bool
                                ,_scMacAddress :: Text
                                ,_scOnBuild :: Maybe Array
@@ -179,29 +179,29 @@ instance FromJSON StartResponse where
   parseJSON = genericParseJSON defaultOptions {fieldLabelModifier = drop 3}
                                            
 data StopResponse = StopResponse {_stId :: Text
-                                  ,_stCreated :: Text
-                                  ,_stPath :: Text
-                                  ,_stArgs :: Array
-                                  ,_stState :: StartState
-                                  ,_stImage :: Text
-                                  ,_stNetworkSettings :: StartNetworkSettings
-                                  ,_stResolvConfPath :: Text
-                                  ,_stHostnamePath :: Text                                                          
-                                  ,_stHostsPath :: Text                                                          
-                                  ,_stLogPath :: Text
-                                  ,_stName :: Text
-                                  ,_stRestartCount:: Int
-                                  ,_stDriver :: Text
-                                  ,_stExecDriver :: Text
-                                  ,_stMountLabel :: Text
-                                  ,_stProcessLabel :: Text
-                                  ,_stVolumes :: Maybe Object
-                                  ,_stVolumesRW :: Maybe Object
-                                  ,_stAppArmorProfile :: Text
-                                  ,_stExecIDs :: Maybe Text
-                                  ,_stHostConfig :: StartHostConfig
-                                  ,_stConfig :: StartConfig
-                                  } deriving (Eq, Show, Typeable, Data, Generic)
+                                 ,_stCreated :: Text
+                                 ,_stPath :: Text
+                                 ,_stArgs :: Array
+                                 ,_stState :: StartState
+                                 ,_stImage :: Text
+                                 ,_stNetworkSettings :: StartNetworkSettings
+                                 ,_stResolvConfPath :: Text
+                                 ,_stHostnamePath :: Text                                                          
+                                 ,_stHostsPath :: Text                                                          
+                                 ,_stLogPath :: Text
+                                 ,_stName :: Text
+                                 ,_stRestartCount:: Int
+                                 ,_stDriver :: Text
+                                 ,_stExecDriver :: Text
+                                 ,_stMountLabel :: Text
+                                 ,_stProcessLabel :: Text
+                                 ,_stVolumes :: Maybe Object
+                                 ,_stVolumesRW :: Maybe Object
+                                 ,_stAppArmorProfile :: Text
+                                 ,_stExecIDs :: Maybe Text
+                                 ,_stHostConfig :: StartHostConfig
+                                 ,_stConfig :: StartConfig
+                                 } deriving (Eq, Show, Typeable, Data, Generic)
 
 instance ToJSON StopResponse where
   toJSON = genericToJSON defaultOptions {fieldLabelModifier = drop 3}

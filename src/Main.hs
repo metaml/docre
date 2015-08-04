@@ -109,8 +109,9 @@ consul = do
                Nothing -> return False
            "stop" -> do
              let node = mkDeregisterNode $ decodeStrict json
+             lift $ putStr "consul: node=" >> print node
              case node of
-               Just n -> lift $ deregisterNode consulClient n >> return True
+               Just n -> lift $ deregisterNode consulClient n
                Nothing -> return False
            _ -> return False
     return r
@@ -128,8 +129,7 @@ unixSocket = do
   return s
 
 mkDeregisterNode :: Maybe StopResponse -> Maybe DeregisterNode
-mkDeregisterNode (Just res) = let name' = _stName res
-                                  name = replace "_" "-" (dropWhile (\c -> c == '/') name')
+mkDeregisterNode (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_stName res))
                               in Just (DeregisterNode (Just $ Datacenter "dev") name)
 mkDeregisterNode Nothing = Nothing
 
@@ -137,14 +137,14 @@ mkDeregisterNode Nothing = Nothing
 
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
 mkRegisterNodes (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
-                                 hostname = _scHostname (_srConfig res)
+                                 hostname = _scHostname (_srConfig res) -- don't use hostname for "name", breaks deregistration
                                  dc = Just $ Datacenter "dev"
                                  net = _srNetworkSettings res :: StartNetworkSettings
                                  ip = _snsIPAddress net
                                  ps = ports (_snsPorts net)
                              in case ps of
                                   -- either hostname or name
-                                  Just ps' -> Just $ map (\port -> RegisterNode dc hostname ip (mkService res port) Nothing) ps'
+                                  Just ps' -> Just $ map (\port -> RegisterNode dc name ip (mkService res port) Nothing) ps'
                                   Nothing -> Just [RegisterNode dc name ip (mkService res 0) Nothing]
 mkRegisterNodes Nothing = Nothing
 

@@ -25,7 +25,8 @@ import Data.Consul
     
 registerNode :: C.ConsulClient -> RegisterNode -> IO Bool
 registerNode _client@C.ConsulClient{..} rr = do
-  req <- mkRequest ccHostname ccPort "/v1/catalog/register" Nothing (Just $ BL.toStrict $ encode rr) False Nothing
+  req <- mkRequest ccHostname ccPort "/v1/catalog/register" Nothing (Just $ BL.toStrict $ encode rr)
+                   False (Just $ C.Datacenter "dev")
   liftIO $ withResponse req ccManager $ \res -> do
     case responseStatus res of
       x | x == status200 -> return True
@@ -33,7 +34,8 @@ registerNode _client@C.ConsulClient{..} rr = do
 
 deregisterNode :: C.ConsulClient -> DeregisterNode -> IO Bool
 deregisterNode _client@C.ConsulClient{..} dr = do
-  req <- mkRequest ccHostname ccPort "/v1/catalog/deregister" Nothing (Just $ BL.toStrict $ encode dr) False Nothing
+  req <- mkRequest ccHostname ccPort "/v1/catalog/deregister" Nothing (Just $ BL.toStrict $ encode dr)
+                   False (Just $ C.Datacenter "dev")
   liftIO $ withResponse req ccManager $ \res -> do
     case responseStatus res of
       x | x == status200 -> return True
