@@ -12,17 +12,20 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
-import Data.Aeson (Object, decodeStrict, eitherDecodeStrict)
+import Data.Aeson (decodeStrict, eitherDecodeStrict)
+import Data.Aeson.Types (Object)
 import Data.Foldable (forM_)
+import Data.Maybe (fromMaybe)    
 import Data.Either (rights)
 import Data.ByteString (ByteString, concat)
 import Data.ByteString.Char8 (pack, unpack, putStrLn)
+import Data.HashMap.Strict (fromList)
 import Data.Text (append, dropWhile, replace, splitOn)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
 import Pipes (Consumer, Producer, Pipe, (>->), await, yield, runEffect, lift)
-import Data.Docker (Event(..), StartResponse(..), StopResponse(..), StartNetworkSettings(..))
+import Data.Docker (Event(..), StartResponse(..), StopResponse(..), StartNetworkSettings(..), StartConfig(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))
 import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient)
 
@@ -95,8 +98,12 @@ consul = do
            "start" -> do
              let nodes = mkRegisterNodes $ decodeStrict json
                  debug = eitherDecodeStrict json :: Either String StartResponse
+                 res' = decodeStrict json :: Maybe StartResponse
              lift $ putStr "consul: nodes=" >> print nodes
              lift $ putStr "consul: debug=" >> print debug
+             case res' of
+               Just r -> lift $ putStr "consul: Env=" >> print (_scEnv (_srConfig r))
+               Nothing -> lift $ putStrLn "Nothing"
              case nodes of
                Just ns -> forM_ ns (\n -> lift $ putStr "n=" >> print n >> registerNode consulClient n) >> return True
                Nothing -> return False
@@ -130,12 +137,14 @@ mkDeregisterNode Nothing = Nothing
 
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
 mkRegisterNodes (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
+                                 hostname = _scHostname (_srConfig res)
                                  dc = Just $ Datacenter "dev"
                                  net = _srNetworkSettings res :: StartNetworkSettings
                                  ip = _snsIPAddress net
                                  ps = ports (_snsPorts net)
                              in case ps of
-                                  Just ps' -> Just $ map (\port -> RegisterNode dc name ip (mkService res port) Nothing) ps'
+                                  -- either hostname or name
+                                  Just ps' -> Just $ map (\port -> RegisterNode dc hostname ip (mkService res port) Nothing) ps'
                                   Nothing -> Just [RegisterNode dc name ip (mkService res 0) Nothing]
 mkRegisterNodes Nothing = Nothing
 
@@ -144,10 +153,12 @@ mkService res port = let cid = _srId res
                          net = _srNetworkSettings res
                          name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
                          sid = append cid $ append "-" $ append name $ append "-" (decodeUtf8 (pack $ show port))
+                         env = fromList $ map (\e -> let l = splitOn "=" e in (head l, last l)) $ _scEnv (_srConfig res)
+                         service = fromMaybe name (Map.lookup "SERVICE" env)
                          ps = _snsPorts net
                      in case ps of
-                          Just ps' -> Just (Service sid name (Map.keys ps') Nothing (Just port))
-                          Nothing -> Just (Service sid name [] Nothing Nothing)
+                          Just ps' -> Just (Service sid service (Map.keys ps') Nothing (Just port))
+                          Nothing -> Just (Service sid service [] Nothing Nothing)
 
 ports :: Maybe Object -> Maybe [Int]
 ports o = case o of

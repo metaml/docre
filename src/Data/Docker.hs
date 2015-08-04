@@ -81,7 +81,7 @@ data StartConfig = StartConfig {_scHostname :: Text
                                ,_scTty :: Bool
                                ,_scOpenStdin :: Bool
                                ,_scStdinOnce :: Bool
-                               ,_scEnv :: Array
+                               ,_scEnv :: [Text]
                                ,_scCmd :: Maybe Text
                                ,_scImage :: Text
                                ,_scVolumes :: Maybe Array
