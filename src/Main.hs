@@ -119,8 +119,8 @@ consul = do
 event :: Socket -> IO ByteString
 event s = do
   sendAll s "GET /events HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"
-  j <- recv s 4096
-  return j
+  recv s 4096
+  -- return j
 
 unixSocket :: IO Socket
 unixSocket = do
@@ -137,7 +137,6 @@ mkDeregisterNode Nothing = Nothing
 
 mkRegisterNodes :: Maybe StartResponse -> Maybe [RegisterNode]
 mkRegisterNodes (Just res) = let name = replace "_" "-" (dropWhile (\c -> c == '/') (_srName res))
-                                 hostname = _scHostname (_srConfig res) -- don't use hostname for "name", breaks deregistration
                                  dc = Just $ Datacenter "dev"
                                  net = _srNetworkSettings res :: StartNetworkSettings
                                  ip = _snsIPAddress net
@@ -162,7 +161,6 @@ mkService res port = let cid = _srId res
 
 ports :: Maybe Object -> Maybe [Int]
 ports o = case o of
-            Just obj -> let ps = Map.keys obj
-                            ports' = map (\p -> decimal p) $ map (\p -> head (splitOn "/" p)) ps
+            Just obj -> let ports' = map (\p -> decimal p) $ map (\p -> head (splitOn "/" p)) $ Map.keys obj
                         in return $ map (\pair -> fst pair) (rights ports')
             Nothing -> Nothing
