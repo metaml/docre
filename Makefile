@@ -1,5 +1,8 @@
 .PHONY: shake build clean init-dev default
 
+# run "make init" after a "git clone" to build a sandbox
+# make init/uninit
+
 default: shake
 
 shake: update build

@@ -66,7 +66,7 @@ json2event = forever $ do
 event2id :: Pipe Event (ByteString, Status) IO ()
 event2id = forever $ do
              e <- await
-             lift $ putStr "event2id: e=" >> print e                  
+             lift $ putStr "--| START: " >> putStr "event2id: e=" >> print e
              yield $ (encodeUtf8 $ _eId e, encodeUtf8 $ _eStatus e)
 
 id2container :: Pipe (ByteString, Status) (ByteString, Status) IO ()
@@ -84,7 +84,7 @@ container2consul :: Pipe (ByteString, Status) (ByteString, Status) IO ()
 container2consul = forever $ do
                      (r, status) <- await  -- r: http response
                      let json :: ByteString = pack $ last $ init $ filter (\c -> c /= "")
-                                              (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
+                                                                          (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
                      lift $ putStr "container2consul: json=" >> print json
                      yield (json, status)
                                  
@@ -100,7 +100,7 @@ consul = do
                  debug = eitherDecodeStrict json :: Either String StartResponse
                  res' = decodeStrict json :: Maybe StartResponse
              lift $ putStr "consul: nodes=" >> print nodes
-             lift $ putStr "consul: debug=" >> print debug
+             lift $ putStr "--| END: consul: debug=" >> print debug
              case res' of
                Just r -> lift $ putStr "consul: Env=" >> print (_scEnv (_srConfig r))
                Nothing -> lift $ putStrLn "Nothing"

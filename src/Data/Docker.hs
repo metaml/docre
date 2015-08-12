@@ -82,11 +82,11 @@ data StartConfig = StartConfig {_scHostname :: Text
                                ,_scOpenStdin :: Bool
                                ,_scStdinOnce :: Bool
                                ,_scEnv :: [Text]
-                               ,_scCmd :: Maybe Text
+                               ,_scCmd :: Maybe [Text]
                                ,_scImage :: Text
                                ,_scVolumes :: Maybe Array
                                ,_scVolumeDriver :: Text
-                               ,_scEntrypoint :: [Text]
+                               ,_scEntrypoint :: Maybe [Text]
                                ,_scNetworkDisabled :: Bool
                                ,_scMacAddress :: Text
                                ,_scOnBuild :: Maybe Array
