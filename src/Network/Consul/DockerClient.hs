@@ -53,7 +53,7 @@ deregisterService _cc@C.ConsulClient{..} _rs@C.RegisterService{..} = do
 
 mkConsulClient :: MonadIO m => m C.ConsulClient
 mkConsulClient = do
-  ch <- liftIO $ lookupEnv "CONSUL_HOST"
+  ch <- liftIO $ lookupEnv "CONSUL_CLIENT"
   let host = case ch of
                Just h -> pack h
                Nothing -> pack "localhost"
