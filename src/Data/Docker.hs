@@ -84,7 +84,7 @@ data StartConfig = StartConfig {_scHostname :: Text
                                ,_scEnv :: [Text]
                                ,_scCmd :: Maybe [Text]
                                ,_scImage :: Text
-                               ,_scVolumes :: Maybe Array
+                               ,_scVolumes :: Maybe [Text]
                                ,_scVolumeDriver :: Text
                                ,_scEntrypoint :: Maybe [Text]
                                ,_scNetworkDisabled :: Bool
@@ -130,8 +130,8 @@ data StartResponse = StartResponse {_srId :: Text
                                    ,_srExecDriver :: Text
                                    ,_srMountLabel :: Text
                                    ,_srProcessLabel :: Text
-                                   ,_srVolumes :: Object
-                                   ,_srVolumesRW :: Object
+                                   ,_srVolumes :: Maybe [Text]
+                                   ,_srVolumesRW :: Maybe Text
                                    ,_srAppArmorProfile :: Text
                                    ,_srExecIDs :: Maybe Text
                                    ,_srHostConfig :: StartHostConfig
@@ -195,8 +195,8 @@ data StopResponse = StopResponse {_stId :: Text
                                  ,_stExecDriver :: Text
                                  ,_stMountLabel :: Text
                                  ,_stProcessLabel :: Text
-                                 ,_stVolumes :: Maybe Object
-                                 ,_stVolumesRW :: Maybe Object
+                                 ,_stVolumes :: Maybe [Text]
+                                 ,_stVolumesRW :: Maybe Text
                                  ,_stAppArmorProfile :: Text
                                  ,_stExecIDs :: Maybe Text
                                  ,_stHostConfig :: StartHostConfig
