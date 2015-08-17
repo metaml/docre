@@ -87,7 +87,7 @@ container2consul = forever $ do
                                                                           (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
                      lift $ putStr "container2consul: json=" >> print json
                      yield (json, status)
-                                 
+
 consul :: Consumer (ByteString, Status) IO ()
 consul = do
   consulClient <- mkConsulClient
