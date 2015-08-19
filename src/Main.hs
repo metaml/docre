@@ -8,7 +8,8 @@ import Network.Socket hiding (recv)
 import qualified Data.HashMap.Strict as Map
 import System.Directory (doesFileExist)    
 import Control.Monad (forever)
-import Control.Concurrent (threadDelay)    
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (async, wait)
 import Control.Monad (when)
 import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
@@ -24,6 +25,7 @@ import Data.Text (append, dropWhile, replace, splitOn)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Text.Read (decimal)
 import Text.Regex (mkRegex, splitRegex)
+import Pipes.Concurrent (spawn', fromInput, toOutput, unbounded)
 import Pipes (Consumer, Producer, Pipe, (>->), await, yield, runEffect, lift)
 import Data.Docker (Event(..), StartResponse(..), StopResponse(..), StartNetworkSettings(..), StartConfig(..))
 import Data.Consul (RegisterNode(..), DeregisterNode(..), Service(..), Datacenter(..))
@@ -32,10 +34,28 @@ import Network.Consul.DockerClient (registerNode, deregisterNode, mkConsulClient
 main :: IO ()
 main = do
   e <- runEitherT $ forever $ do
-         sock <- lift $ doesFileExist "/var/run/docker.sock"
+         sock :: Bool <- lift $ doesFileExist "/var/run/docker.sock"
          lift $ print sock
          _ <- lift $ threadDelay 1000000
-         when (sock == True) $ left ()
+         when (sock) $ left ()
+  case e of
+    Right _ -> main
+    Left  _ -> listener
+    
+listener :: IO ()
+listener = do
+  (out, inp, seal) <- spawn' unbounded
+  t <- async $ do runEffect $ docker >-> toOutput out
+  t' <- async $ forever $ do runEffect $ fromInput inp >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
+  mapM_ wait ([t, t'])
+         
+main' :: IO ()
+main' = do
+  e <- runEitherT $ forever $ do
+         sock :: Bool <- lift $ doesFileExist "/var/run/docker.sock"
+         lift $ print sock
+         _ <- lift $ threadDelay 1000000
+         when (sock) $ left ()
   case e of
     Right _ -> main
     Left  _ -> dockerListener
@@ -88,6 +108,7 @@ container2consul = forever $ do
                      lift $ putStr "container2consul: json=" >> print json
                      yield (json, status)
 
+-- @todo: debug verify/debug code below--should only be on the _queue branch
 consul :: Consumer (ByteString, Status) IO ()
 consul = do
   consulClient <- mkConsulClient
@@ -105,17 +126,17 @@ consul = do
                Just r -> lift $ putStr "consul: Env=" >> print (_scEnv (_srConfig r))
                Nothing -> lift $ putStrLn "Nothing"
              case nodes of
-               Just ns -> forM_ ns (\n -> lift $ putStr "n=" >> print n >> registerNode consulClient n) >> return True
-               Nothing -> return False
+               Just ns -> lift $ forM_ ns (\n -> registerNode consulClient n)
+               Nothing -> return ()
            "stop" -> do
              let node = mkDeregisterNode $ decodeStrict json
              lift $ putStr "consul: node=" >> print node
              case node of
-               Just n -> lift $ deregisterNode consulClient n
-               Nothing -> return False
-           _ -> return False
+               Just n -> lift $ deregisterNode consulClient n >> return ()
+               Nothing -> return ()
+           _ -> return ()
     return r
-
+           
 event :: Socket -> IO ByteString
 event s = do
   sendAll s "GET /events HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"
