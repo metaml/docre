@@ -6,16 +6,16 @@ import Network.Socket hiding (recv)
 -- import qualified GHC.IO.Exception as Ex
 -- import Control.Exception (try, throwIO)
 import qualified Data.HashMap.Strict as Map
-import System.Directory (doesFileExist)    
+import System.Directory (doesFileExist)
 import Control.Monad (forever)
-import Control.Concurrent (threadDelay)    
+import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.Trans.Either (left, runEitherT)
 import Network.Socket.ByteString (recv, sendAll)
 import Data.Aeson (decodeStrict, eitherDecodeStrict)
 import Data.Aeson.Types (Object)
 import Data.Foldable (forM_)
-import Data.Maybe (fromMaybe)    
+import Data.Maybe (fromMaybe)
 import Data.Either (rights)
 import Data.ByteString (ByteString, concat)
 import Data.ByteString.Char8 (pack, unpack, putStrLn)
@@ -33,26 +33,25 @@ main :: IO ()
 main = do
   e <- runEitherT $ forever $ do
          sock <- lift $ doesFileExist "/var/run/docker.sock"
-         lift $ print sock
-         _ <- lift $ threadDelay 1000000
-         when (sock == True) $ left ()
+         _ <- lift $ print sock >> threadDelay 1000000
+         when sock $ left ()
   case e of
-    Right _ -> main
     Left  _ -> dockerListener
-    
+    Right _ -> main
+
 dockerListener :: IO ()
 dockerListener = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
 
 type Status = ByteString
 type Name = ByteString
-type Ip = ByteString        
+type Ip = ByteString
 type Services = [ByteString]
-    
+
 -- | @todo: handle error cases
 docker :: Producer ByteString IO ()
 docker = forever $ do
-           s <- lift $ unixSocket       
-           _ <- ($) forever $ lift (event s) >>= yield 
+           s <- lift $ unixSocket
+           _ <- ($) forever $ lift (event s) >>= yield
            lift $ sClose s
 
 json2event :: Pipe ByteString Event IO ()
