@@ -53,7 +53,7 @@ type Services = [ByteString]
 docker :: Producer ByteString IO ()
 docker = forever $ do
            s <- lift $ unixSocket
-           lift $ putStr "docker: unixSocker=" >> print s
+           lift $ putStr "docker: unixSocker=[" >> print s >> putStrLn "]"
            _ <- ($) forever $ lift (event s) >>= yield
            lift $ sClose s
 
