@@ -40,7 +40,9 @@ main = do
     Right _ -> main
 
 dockerListener :: IO ()
-dockerListener = runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
+dockerListener = do
+  putStrLn "dockerLIsterner"
+  runEffect $ docker >-> json2event >-> event2id >-> id2container >-> container2consul >-> consul
 
 type Status = ByteString
 type Name = ByteString
