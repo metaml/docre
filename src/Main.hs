@@ -54,7 +54,6 @@ docker :: Producer ByteString IO ()
 docker = forever $ do
            lift $ putStr "docker:"
            s <- lift $ unixSocket
-           lift $ putStr " unixSocker=[" >> print s >> putStrLn "]"
            _ <- ($) forever $ lift (event s) >>= yield
            lift $ sClose s
 
@@ -69,7 +68,7 @@ json2event = forever $ do
 event2id :: Pipe Event (ByteString, Status) IO ()
 event2id = forever $ do
              e <- await
-             lift $ putStr "--| START: " >> putStr "event2id: e=" >> print e
+             lift $ putStr "--| EVENT2ID: " >> putStr "event2id: e=" >> print e
              yield $ (encodeUtf8 $ _eId e, encodeUtf8 $ _eStatus e)
 
 id2container :: Pipe (ByteString, Status) (ByteString, Status) IO ()
@@ -77,7 +76,6 @@ id2container = forever $ do
                  s <- lift $ unixSocket
                  _ <- ($) forever $ do
                            (eId, status) <- await
-                           lift $ putStr "id2container: eId=" >> print eId
                            lift $ sendAll s $ concat ["GET /containers/", eId, "/json HTTP/1.1", "\r\n\r\n"]
                            r <- lift $ recv s 4096 -- r: http response
                            yield $ (r, status)
@@ -88,7 +86,6 @@ container2consul = forever $ do
                      (r, status) <- await  -- r: http response
                      let json :: ByteString = pack $ last $ init $ filter (\c -> c /= "")
                                                                           (splitRegex (mkRegex "[ \t\r\n]+") (unpack r))
-                     lift $ putStr "container2consul: json=" >> print json
                      yield (json, status)
 
 consul :: Consumer (ByteString, Status) IO ()
@@ -102,8 +99,7 @@ consul = do
              let nodes = mkRegisterNodes $ decodeStrict json
                  debug = eitherDecodeStrict json :: Either String StartResponse
                  res' = decodeStrict json :: Maybe StartResponse
-             lift $ putStr "consul: nodes=" >> print nodes
-             lift $ putStr "--| END: consul: debug=" >> print debug
+             lift $ putStr "consul: nodes=" >> print nodes >> putStr "DEBUG=" >>  print debug
              case res' of
                Just r -> lift $ putStr "consul: Env=" >> print (_scEnv (_srConfig r))
                Nothing -> lift $ putStrLn "Nothing"
