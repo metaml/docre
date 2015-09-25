@@ -7,7 +7,7 @@ author: ml
 maintainer: metaml@gmail.com
 category: Utilities
 build-type: Simple
-cabal-version: >=1.10
+cabal-version: >= 1.20
 
 library
   hs-source-dirs: src
