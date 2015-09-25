@@ -1,0 +1,5 @@
+flags: {}
+packages:
+- '.'
+extra-deps: [regex-compat-tdfa-0.95.1.4]
+resolver: lts-3.6

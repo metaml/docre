@@ -1,14 +1,6 @@
-Main
-Spec
 *.hi
-*.dyn_hi
 *.o
+*.dyn_hi
 *.dyn_o
-.cabal*
-.ghc
-.shake
-.ghci
 .#*.hs
-cabal.sandbox.config
-dist
-bin
+.stack-work
